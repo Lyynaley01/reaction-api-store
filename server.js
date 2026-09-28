@@ -9,42 +9,32 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const multer = require("multer");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
-const PORT = Number(process.env.PORT || 3000);
-const DB_FILE = path.join(__dirname, "data", "db.json");
-const UPLOAD_DIR = path.join(__dirname, "uploads");
 
-fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+  throw new Error("SUPABASE_URL dan SUPABASE_SECRET_KEY wajib diatur.");
+}
+
+const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_SECRET_KEY,
+  {	
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
+const PORT = Number(process.env.PORT || 3000);
 
 const COIN_UNIT = Math.max(1, Number(process.env.COIN_UNIT || 100));
 const COIN_UNIT_PRICE = Math.max(0, Number(process.env.COIN_UNIT_PRICE || 5000));
 const MAX_UPLOAD_MB = Math.max(1, Number(process.env.MAX_UPLOAD_MB || 5));
-
-function loadDB() {
-  if (!fs.existsSync(DB_FILE)) {
-    return {
-      users: [],
-      orders: [],
-      usage: [],
-      settings: { createdAt: new Date().toISOString() }
-    };
-  }
-  try {
-    return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-  } catch {
-    return { users: [], orders: [], usage: [], settings: {} };
-  }
-}
-
-let db = loadDB();
-
-function saveDB() {
-  const tmp = DB_FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
-  fs.renameSync(tmp, DB_FILE);
-}
 
 function id(prefix = "") {
   return prefix + crypto.randomBytes(12).toString("hex");
@@ -58,15 +48,48 @@ function now() {
   return new Date().toISOString();
 }
 
+async function getUserById(userId) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function getUserByEmail(email) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function getUserByApiKey(key) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("api_key", key)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 function publicUser(u) {
   return {
     id: u.id,
     email: u.email,
     name: u.name,
     coins: u.coins || 0,
-    coinExpiry: u.coinExpiry || null,
-    apiKey: u.apiKey,
-    createdAt: u.createdAt
+    coinExpiry: u.coin_expiry || null,
+    apiKey: u.api_key,
+    createdAt: u.created_at
   };
 }
 
@@ -78,19 +101,43 @@ function issueToken(user) {
   );
 }
 
-function auth(req, res, next) {
+async function auth(req, res, next) {
   const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : req.cookies?.token;
-  if (!token) return res.status(401).json({ success: false, error: "UNAUTHORIZED" });
+  const token = header.startsWith("Bearer ")
+    ? header.slice(7)
+    : req.cookies?.token;
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: "UNAUTHORIZED"
+    });
+  }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || "dev-secret-change-me");
-    const user = db.users.find(x => x.id === payload.sub);
-    if (!user) return res.status(401).json({ success: false, error: "USER_NOT_FOUND" });
+    const payload = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "dev-secret-change-me"
+    );
+
+    const user = await getUserById(payload.sub);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: "USER_NOT_FOUND"
+      });
+    }
+
     req.user = user;
     next();
-  } catch {
-    return res.status(401).json({ success: false, error: "INVALID_TOKEN" });
+  } catch (err) {
+    console.error("[Auth]", err.message);
+
+    return res.status(401).json({
+      success: false,
+      error: "INVALID_TOKEN"
+    });
   }
 }
 
@@ -120,7 +167,8 @@ function validEmail(email) {
 }
 
 function isExpired(user) {
-  return user.coinExpiry && new Date(user.coinExpiry).getTime() <= Date.now();
+  return user.coin_expiry &&
+    new Date(user.coin_expiry).getTime() <= Date.now();
 }
 
 function availableCoins(user) {
@@ -128,27 +176,29 @@ function availableCoins(user) {
   return Math.max(0, Number(user.coins || 0));
 }
 
-function addCoins(user, coins, duration) {
-  const amount = Number(coins);
-  user.coins = availableCoins(user) + amount;
-
+function calculateCoinExpiry(currentExpiry, duration) {
   if (duration === "permanent") {
-    user.coinExpiry = null;
-  } else {
-    const days = duration === "7d" ? 7 : 30;
-    const base = user.coinExpiry && new Date(user.coinExpiry).getTime() > Date.now()
-      ? new Date(user.coinExpiry)
-      : new Date();
-    base.setDate(base.getDate() + days);
-    user.coinExpiry = base.toISOString();
+    return null;
   }
+
+  const days = duration === "7_days" ? 7 : 30;
+
+  const base =
+    currentExpiry &&
+    new Date(currentExpiry).getTime() > Date.now()
+      ? new Date(currentExpiry)
+      : new Date();
+
+  base.setDate(base.getDate() + days);
+
+  return base.toISOString();
 }
 
 function packageOptions() {
   return [
     { id: "permanent", name: "Permanen", duration: "permanent" },
-    { id: "30d", name: "30 Hari", duration: "30d" },
-    { id: "7d", name: "7 Hari", duration: "7d" }
+    { id: "30_days", name: "30 Hari", duration: "30_days" },
+    { id: "7_days", name: "7 Hari", duration: "7_days" }
   ];
 }
 
@@ -208,46 +258,109 @@ app.get("/api/config", (_, res) => {
 });
 
 app.post("/api/auth/register", async (req, res) => {
-  const email = normalizeEmail(req.body.email);
-  const name = String(req.body.name || "").trim().slice(0, 80);
-  const password = String(req.body.password || "");
+  try {
+    const email = normalizeEmail(req.body.email);
+    const name = String(req.body.name || "").trim().slice(0, 80);
+    const password = String(req.body.password || "");
 
-  if (!validEmail(email)) return res.status(400).json({ success: false, error: "INVALID_EMAIL" });
-  if (password.length < 6) return res.status(400).json({ success: false, error: "PASSWORD_MIN_6" });
-  if (db.users.some(x => x.email === email)) return res.status(409).json({ success: false, error: "EMAIL_EXISTS" });
+    if (!validEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_EMAIL"
+      });
+    }
 
-  const user = {
-    id: id("usr_"),
-    email,
-    name: name || email.split("@")[0],
-    passwordHash: await bcrypt.hash(password, 12),
-    apiKey: apiKey(),
-    coins: 0,
-    coinExpiry: null,
-    role: "user",
-    createdAt: now()
-  };
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "PASSWORD_MIN_6"
+      });
+    }
 
-  db.users.push(user);
-  saveDB();
+    const existing = await getUserByEmail(email);
 
-  res.json({
-    success: true,
-    token: issueToken(user),
-    user: publicUser(user)
-  });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        error: "EMAIL_EXISTS"
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const newApiKey = apiKey();
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .insert({
+        email,
+        name: name || email.split("@")[0],
+        password_hash: passwordHash,
+        api_key: newApiKey,
+        coins: 0,
+        coin_expiry: null,
+        role: "user"
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("[Register]", error);
+
+      if (error.code === "23505") {
+        return res.status(409).json({
+          success: false,
+          error: "EMAIL_EXISTS"
+        });
+      }
+
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      token: issueToken(user),
+      user: publicUser(user)
+    });
+  } catch (err) {
+    console.error("[Register]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "REGISTER_FAILED"
+    });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  const email = normalizeEmail(req.body.email);
-  const password = String(req.body.password || "");
-  const user = db.users.find(x => x.email === email);
+  try {
+    const email = normalizeEmail(req.body.email);
+    const password = String(req.body.password || "");
 
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-    return res.status(401).json({ success: false, error: "INVALID_LOGIN" });
+    const user = await getUserByEmail(email);
+
+    if (
+      !user ||
+      !(await bcrypt.compare(password, user.password_hash))
+    ) {
+      return res.status(401).json({
+        success: false,
+        error: "INVALID_LOGIN"
+      });
+    }
+
+    res.json({
+      success: true,
+      token: issueToken(user),
+      user: publicUser(user)
+    });
+  } catch (err) {
+    console.error("[Login]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "LOGIN_FAILED"
+    });
   }
-
-  res.json({ success: true, token: issueToken(user), user: publicUser(user) });
 });
 
 app.post("/api/auth/logout", (_, res) => res.json({ success: true }));
@@ -256,10 +369,34 @@ app.get("/api/me", auth, (req, res) => {
   res.json({ success: true, user: publicUser(req.user) });
 });
 
-app.post("/api/me/regenerate-key", auth, (req, res) => {
-  req.user.apiKey = apiKey();
-  saveDB();
-  res.json({ success: true, apiKey: req.user.apiKey });
+app.post("/api/me/regenerate-key", auth, async (req, res) => {
+  try {
+    const newApiKey = apiKey();
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .update({
+        api_key: newApiKey,
+        updated_at: now()
+      })
+      .eq("id", req.user.id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      apiKey: user.api_key
+    });
+  } catch (err) {
+    console.error("[Regenerate API Key]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "API_KEY_REGENERATE_FAILED"
+    });
+  }
 });
 
 app.get("/api/packages", (_, res) => {
@@ -271,72 +408,176 @@ app.get("/api/packages", (_, res) => {
   });
 });
 
-app.post("/api/orders", auth, (req, res) => {
-  const coins = Number(req.body.coins);
-  const duration = String(req.body.duration || "permanent");
+app.post("/api/orders", auth, async (req, res) => {
+  try {
+    const coins = Number(req.body.coins);
+    const duration = String(req.body.duration || "permanent");
 
-  if (!Number.isInteger(coins) || coins < 100) {
-    return res.status(400).json({ success: false, error: "COINS_MIN_100_INTEGER" });
-  }
-  if (coins % 100 !== 0) {
-    return res.status(400).json({ success: false, error: "COINS_MUST_BE_MULTIPLE_OF_100" });
-  }
-  if (!["permanent", "7d", "30d"].includes(duration)) {
-    return res.status(400).json({ success: false, error: "INVALID_DURATION" });
-  }
-
-  const order = {
-    id: id("ord_"),
-    userId: req.user.id,
-    coins,
-    duration,
-    price: packagePrice(coins),
-    status: "pending",
-    proofFile: null,
-    createdAt: now(),
-    updatedAt: now()
-  };
-
-  db.orders.unshift(order);
-  saveDB();
-
-  res.json({
-    success: true,
-    order: {
-      ...order,
-      paymentInstructions: {
-        message: "Bayar sesuai total lalu upload bukti pembayaran melalui dashboard.",
-        total: order.price
-      }
+    if (!Number.isInteger(coins) || coins < 100) {
+      return res.status(400).json({
+        success: false,
+        error: "COINS_MIN_100_INTEGER"
+      });
     }
-  });
+
+    if (coins % 100 !== 0) {
+      return res.status(400).json({
+        success: false,
+        error: "COINS_MUST_BE_MULTIPLE_OF_100"
+      });
+    }
+
+    if (!["permanent", "7_days", "30_days"].includes(duration)) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_DURATION"
+      });
+    }
+
+    const createdAt = now();
+
+    const { data: order, error } = await supabase
+      .from("orders")
+      .insert({
+        user_id: req.user.id,
+        coins,
+        price: packagePrice(coins),
+        duration,
+        status: "pending",
+        payment_proof: null,
+        created_at: createdAt,
+        updated_at: createdAt
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      order: {
+        ...order,
+        paymentInstructions: {
+          message:
+            "Bayar sesuai total lalu upload bukti pembayaran melalui dashboard.",
+          total: order.price
+        }
+      }
+    });
+  } catch (err) {
+    console.error("[Create Order]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ORDER_CREATE_FAILED"
+    });
+  }
 });
 
-app.get("/api/orders", auth, (req, res) => {
-  res.json({
-    success: true,
-    orders: db.orders.filter(x => x.userId === req.user.id).slice(0, 50)
-  });
+app.get("/api/orders", auth, async (req, res) => {
+  try {
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      orders: orders || []
+    });
+  } catch (err) {
+    console.error("[Orders]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ORDERS_FETCH_FAILED"
+    });
+  }
 });
 
-app.post("/api/orders/:id/proof", auth, upload.single("proof"), (req, res) => {
-  const order = db.orders.find(x => x.id === req.params.id && x.userId === req.user.id);
-  if (!order) return res.status(404).json({ success: false, error: "ORDER_NOT_FOUND" });
-  if (order.status !== "pending") return res.status(400).json({ success: false, error: "ORDER_NOT_PENDING" });
-  if (!req.file) return res.status(400).json({ success: false, error: "PROOF_REQUIRED" });
+app.post("/api/orders/:id/proof", auth, upload.single("proof"), async (req, res) => {
+  try {
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", req.params.id)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
 
-  order.proofFile = req.file.filename;
-  order.updatedAt = now();
-  saveDB();
+    if (orderError) throw orderError;
 
-  res.json({ success: true, message: "Bukti pembayaran berhasil dikirim." });
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "ORDER_NOT_FOUND"
+      });
+    }
+
+    if (order.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        error: "ORDER_NOT_PENDING"
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: "PROOF_REQUIRED"
+      });
+    }
+
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({
+        payment_proof: req.file.filename,
+        updated_at: now()
+      })
+      .eq("id", order.id);
+
+    if (updateError) throw updateError;
+
+    res.json({
+      success: true,
+      message: "Bukti pembayaran berhasil dikirim."
+    });
+  } catch (err) {
+    console.error("[Order Proof]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "PROOF_UPLOAD_FAILED"
+    });
+  }
 });
 
-app.get("/api/usage", auth, (req, res) => {
-  res.json({
-    success: true,
-    usage: db.usage.filter(x => x.userId === req.user.id).slice(0, 100)
-  });
+app.get("/api/usage", auth, async (req, res) => {
+  try {
+    const { data: usage, error } = await supabase
+      .from("usage_logs")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      usage: usage || []
+    });
+  } catch (err) {
+    console.error("[Usage]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "USAGE_FETCH_FAILED"
+    });
+  }
 });
 
 function extractApiKey(req) {
@@ -346,29 +587,69 @@ function extractApiKey(req) {
   return "";
 }
 
-function getApiUser(req) {
+async function getApiUser(req) {
   const key = extractApiKey(req);
   if (!key) return null;
-  return db.users.find(u => u.apiKey === key) || null;
+
+  return await getUserByApiKey(key);
 }
 
 app.post("/api/v1/reaction", async (req, res) => {
-  const user = getApiUser(req);
-  if (!user) return res.status(401).json({ success: false, error: "INVALID_API_KEY" });
+  const user = await getApiUser(req);
+
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      error: "INVALID_API_KEY"
+    });
+  }
 
   const url = String(req.body.url || "").trim();
   const reaction = String(req.body.reaction || "").trim();
 
-  if (!url) return res.status(400).json({ success: false, error: "URL_REQUIRED" });
-  if (!/^https?:\/\/.+/i.test(url)) return res.status(400).json({ success: false, error: "INVALID_URL" });
-  if (!reaction || reaction.length > 16) return res.status(400).json({ success: false, error: "INVALID_REACTION" });
+  if (!url) {
+    return res.status(400).json({
+      success: false,
+      error: "URL_REQUIRED"
+    });
+  }
 
-  const coins = availableCoins(user);
-  if (coins < 1) {
+  if (!/^https?:\/\/.+/i.test(url)) {
+    return res.status(400).json({
+      success: false,
+      error: "INVALID_URL"
+    });
+  }
+
+  if (!reaction || reaction.length > 16) {
+    return res.status(400).json({
+      success: false,
+      error: "INVALID_REACTION"
+    });
+  }
+
+  // Reserve tepat 1 coin secara atomic.
+  const { data: remaining, error: consumeError } = await supabase
+    .rpc("consume_one_coin", {
+      p_user_id: user.id
+    });
+
+  if (consumeError) {
+    console.error("[Coin Consume]", consumeError);
+
+    return res.status(500).json({
+      success: false,
+      error: "COIN_TRANSACTION_FAILED"
+    });
+  }
+
+  const coinRemainingAfterReserve = Number(remaining);
+
+  if (coinRemainingAfterReserve < 0) {
     return res.status(402).json({
       success: false,
       error: "INSUFFICIENT_COINS",
-      coin_remaining: coins
+      coin_remaining: 0
     });
   }
 
@@ -390,64 +671,96 @@ app.post("/api/v1/reaction", async (req, res) => {
 
     const data = upstream.data || {};
 
+    // Provider gagal → kembalikan coin yang tadi di-reserve.
     if (!data.success) {
-      db.usage.unshift({
-        id: id("use_"),
-        userId: user.id,
-        status: "failed",
-        coinUsed: 0,
-        url,
+      const { error: refundError } = await supabase.rpc(
+        "refund_one_coin",
+        {
+          p_user_id: user.id
+        }
+      );
+
+      if (refundError) {
+        console.error("[Coin Refund]", refundError);
+      }
+
+      await supabase.from("usage_logs").insert({
+        user_id: user.id,
+        endpoint: "/api/v1/reaction",
+        target_url: url,
         reaction,
-        upstreamStatus: upstream.status,
-        error: data?.error?.message || data?.message || "Upstream request failed",
-        createdAt: now()
+        coins_used: 0,
+        status: "failed",
+        response_data: {
+          upstream_status: upstream.status,
+          error:
+            data?.error?.message ||
+            data?.message ||
+            "Upstream request failed"
+        }
       });
-      saveDB();
 
       return res.status(502).json({
         success: false,
         error: "UPSTREAM_FAILED",
-        message: data?.error?.message || data?.message || "Reaction provider gagal.",
+        message:
+          data?.error?.message ||
+          data?.message ||
+          "Reaction provider gagal.",
         upstream_status: upstream.status
       });
     }
 
-    // Potong tepat 1 coin hanya setelah upstream sukses.
-    user.coins = coins - 1;
-
-    db.usage.unshift({
-      id: id("use_"),
-      userId: user.id,
-      status: "success",
-      coinUsed: 1,
-      url,
+    // Provider sukses → coin tetap terpakai.
+    await supabase.from("usage_logs").insert({
+      user_id: user.id,
+      endpoint: "/api/v1/reaction",
+      target_url: url,
       reaction,
-      upstreamStatus: upstream.status,
-      latencyMs: Date.now() - started,
-      createdAt: now()
+      coins_used: 1,
+      status: "success",
+      response_data: {
+        upstream_status: upstream.status,
+        latency_ms: Date.now() - started,
+        task: data.task || null,
+        vip: data.vip || null
+      }
     });
-    saveDB();
 
     return res.json({
       success: true,
       message: "Reaction berhasil diproses.",
       coin_used: 1,
-      coin_remaining: user.coins,
+      coin_remaining: coinRemainingAfterReserve,
       task: data.task || null,
       vip: data.vip || null
     });
   } catch (err) {
-    db.usage.unshift({
-      id: id("use_"),
-      userId: user.id,
-      status: "failed",
-      coinUsed: 0,
-      url,
+    console.error("[Reaction Upstream]", err.message);
+
+    // Provider tidak dapat dihubungi → refund coin.
+    const { error: refundError } = await supabase.rpc(
+      "refund_one_coin",
+      {
+        p_user_id: user.id
+      }
+    );
+
+    if (refundError) {
+      console.error("[Coin Refund]", refundError);
+    }
+
+    await supabase.from("usage_logs").insert({
+      user_id: user.id,
+      endpoint: "/api/v1/reaction",
+      target_url: url,
       reaction,
-      error: err.message,
-      createdAt: now()
+      coins_used: 0,
+      status: "failed",
+      response_data: {
+        error: err.message
+      }
     });
-    saveDB();
 
     return res.status(502).json({
       success: false,
@@ -478,23 +791,86 @@ app.post("/api/admin/login", (req, res) => {
   res.json({ success: true, token });
 });
 
-app.get("/api/admin/stats", adminAuth, (_, res) => {
-  const users = db.users.length;
-  const pending = db.orders.filter(x => x.status === "pending").length;
-  const successful = db.usage.filter(x => x.status === "success").length;
-  res.json({ success: true, stats: { users, pending, successful } });
+app.get("/api/admin/stats", adminAuth, async (_, res) => {
+  try {
+    const [
+      { count: users, error: usersError },
+      { count: pending, error: pendingError },
+      { count: successful, error: successfulError }
+    ] = await Promise.all([
+      supabase
+        .from("users")
+        .select("*", { count: "exact", head: true }),
+
+      supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending"),
+
+      supabase
+        .from("usage_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "success")
+    ]);
+
+    if (usersError) throw usersError;
+    if (pendingError) throw pendingError;
+    if (successfulError) throw successfulError;
+
+    res.json({
+      success: true,
+      stats: {
+        users: users || 0,
+        pending: pending || 0,
+        successful: successful || 0
+      }
+    });
+  } catch (err) {
+    console.error("[Admin Stats]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ADMIN_STATS_FAILED"
+    });
+  }
 });
 
-app.get("/api/admin/orders", adminAuth, (_, res) => {
-  const result = db.orders.map(o => {
-    const u = db.users.find(x => x.id === o.userId);
-    return {
-      ...o,
-      user: u ? { id: u.id, email: u.email, name: u.name } : null,
-      proofUrl: o.proofFile ? `/api/admin/proof/${encodeURIComponent(o.proofFile)}` : null
-    };
-  });
-  res.json({ success: true, orders: result.slice(0, 200) });
+app.get("/api/admin/orders", adminAuth, async (_, res) => {
+  try {
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select(`
+        *,
+        user:users (
+          id,
+          email,
+          name
+        )
+      `)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+
+    const result = (orders || []).map(order => ({
+      ...order,
+      proofUrl: order.payment_proof
+        ? `/api/admin/proof/${encodeURIComponent(order.payment_proof)}`
+        : null
+    }));
+
+    res.json({
+      success: true,
+      orders: result
+    });
+  } catch (err) {
+    console.error("[Admin Orders]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ADMIN_ORDERS_FAILED"
+    });
+  }
 });
 
 app.get("/api/admin/proof/:file", adminAuth, (req, res) => {
@@ -504,34 +880,144 @@ app.get("/api/admin/proof/:file", adminAuth, (req, res) => {
   res.sendFile(full);
 });
 
-app.post("/api/admin/orders/:id/approve", adminAuth, (req, res) => {
-  const order = db.orders.find(x => x.id === req.params.id);
-  if (!order) return res.status(404).json({ success: false, error: "ORDER_NOT_FOUND" });
-  if (order.status !== "pending") return res.status(400).json({ success: false, error: "ORDER_NOT_PENDING" });
+app.post("/api/admin/orders/:id/approve", adminAuth, async (req, res) => {
+  try {
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", req.params.id)
+      .maybeSingle();
 
-  const user = db.users.find(x => x.id === order.userId);
-  if (!user) return res.status(404).json({ success: false, error: "USER_NOT_FOUND" });
+    if (orderError) throw orderError;
 
-  addCoins(user, order.coins, order.duration);
-  order.status = "approved";
-  order.updatedAt = now();
-  order.approvedAt = now();
-  saveDB();
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "ORDER_NOT_FOUND"
+      });
+    }
 
-  res.json({ success: true, message: "Order approved dan coin masuk." });
+    if (order.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        error: "ORDER_NOT_PENDING"
+      });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", order.user_id)
+      .maybeSingle();
+
+    if (userError) throw userError;
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "USER_NOT_FOUND"
+      });
+    }
+
+    const currentCoins = availableCoins(user);
+    const newCoins = currentCoins + Number(order.coins);
+
+    const newExpiry = calculateCoinExpiry(
+      user.coin_expiry,
+      order.duration
+    );
+
+    const approvedAt = now();
+
+    const { error: userUpdateError } = await supabase
+      .from("users")
+      .update({
+        coins: newCoins,
+        coin_expiry: newExpiry,
+        updated_at: approvedAt
+      })
+      .eq("id", user.id);
+
+    if (userUpdateError) throw userUpdateError;
+
+    const { error: orderUpdateError } = await supabase
+      .from("orders")
+      .update({
+        status: "approved",
+        approved_at: approvedAt,
+        updated_at: approvedAt
+      })
+      .eq("id", order.id)
+      .eq("status", "pending");
+
+    if (orderUpdateError) throw orderUpdateError;
+
+    res.json({
+      success: true,
+      message: "Order approved dan coin masuk."
+    });
+  } catch (err) {
+    console.error("[Admin Approve]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ORDER_APPROVE_FAILED"
+    });
+  }
 });
 
-app.post("/api/admin/orders/:id/reject", adminAuth, (req, res) => {
-  const order = db.orders.find(x => x.id === req.params.id);
-  if (!order) return res.status(404).json({ success: false, error: "ORDER_NOT_FOUND" });
-  if (order.status !== "pending") return res.status(400).json({ success: false, error: "ORDER_NOT_PENDING" });
+app.post("/api/admin/orders/:id/reject", adminAuth, async (req, res) => {
+  try {
+    const reason = String(
+      req.body.reason || "Pembayaran tidak valid."
+    ).slice(0, 300);
 
-  order.status = "rejected";
-  order.reason = String(req.body.reason || "Pembayaran tidak valid.").slice(0, 300);
-  order.updatedAt = now();
-  saveDB();
+    const { data: order, error: findError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", req.params.id)
+      .maybeSingle();
 
-  res.json({ success: true, message: "Order ditolak." });
+    if (findError) throw findError;
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "ORDER_NOT_FOUND"
+      });
+    }
+
+    if (order.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        error: "ORDER_NOT_PENDING"
+      });
+    }
+
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({
+        status: "rejected",
+        reason,
+        updated_at: now()
+      })
+      .eq("id", order.id)
+      .eq("status", "pending");
+
+    if (updateError) throw updateError;
+
+    res.json({
+      success: true,
+      message: "Order ditolak."
+    });
+  } catch (err) {
+    console.error("[Admin Reject]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ORDER_REJECT_FAILED"
+    });
+  }
 });
 
 app.get("/docs", (_, res) => res.sendFile(path.join(__dirname, "public", "docs.html")));
