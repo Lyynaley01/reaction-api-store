@@ -1,0 +1,11 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API Docs</title><link rel="stylesheet" href="/style.css"></head><body><header class="nav"><a class="brand" href="/">REACTION<span>API</span></a><nav><a href="/">Home</a><a href="/dashboard.html">Dashboard</a></nav></header><main class="docs"><div class="eyebrow">DOCUMENTATION</div><h1>Reaction API</h1><p>Gunakan API key akun pada header <code>X-API-Key</code> atau <code>Authorization: Bearer</code>.</p><div class="panel"><h2>POST /api/v1/reaction</h2><pre>curl -X POST https://DOMAIN-ANDA/api/v1/reaction \\
+-H "X-API-Key: rak_xxxxxxxxx" \\
+-H "Content-Type: application/json" \\
+-d '{"url":"https://whatsapp.com/channel/...","reaction":"❤️"}'</pre><h3>Response sukses</h3><pre>{
+  "success": true,
+  "message": "Reaction berhasil diproses.",
+  "coin_used": 1,
+  "coin_remaining": 99,
+  "task": {},
+  "vip": {}
+}</pre></div><div class="panel"><h2>Rules</h2><ul><li>1 successful request = 1 coin.</li><li>Failed upstream request tidak memotong coin.</li><li>Minimal custom top-up 100 coin.</li><li>Custom coin harus kelipatan 100.</li></ul></div></main></body></html>
