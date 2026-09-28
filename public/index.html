@@ -34,25 +34,10 @@
       <div class="eyebrow">PRICING</div>
       <h2>Coin sesuai kebutuhan.</h2>
     </div>
-    <p>Harga dasar Rp5.000 untuk setiap 100 coin.</p>
+    <p>Jumlah coin dan harga paket dapat diatur dari konfigurasi admin.</p>
   </div>
-  <div class="cards">
-    <div class="price-card">
-      <div class="tag">PERMANEN</div><h3>100 Coin</h3><strong>Rp5.000</strong>
-      <p>Coin tidak memiliki masa berlaku.</p><a class="btn full" href="/register.html">Pilih</a>
-    </div>
-    <div class="price-card featured">
-      <div class="tag">30 HARI</div><h3>100 Coin</h3><strong>Rp5.000</strong>
-      <p>Berlaku 30 hari sejak paket aktif.</p><a class="btn full" href="/register.html">Pilih</a>
-    </div>
-    <div class="price-card">
-      <div class="tag">7 HARI</div><h3>100 Coin</h3><strong>Rp5.000</strong>
-      <p>Berlaku 7 hari sejak paket aktif.</p><a class="btn full" href="/register.html">Pilih</a>
-    </div>
-    <div class="price-card">
-      <div class="tag">CUSTOM</div><h3>100+ Coin</h3><strong>Rp5.000 / 100</strong>
-      <p>Harus bilangan bulat kelipatan 100.</p><a class="btn full" href="/dashboard.html">Custom</a>
-    </div>
+  <div class="cards" id="pricingCards">
+    <div class="price-card"><div class="tag">MEMUAT</div><h3>...</h3><strong>...</strong><p>Memuat konfigurasi paket.</p></div>
   </div>
 </section>
 
@@ -63,12 +48,33 @@
   </div>
   <div class="steps">
     <div><b>01</b><span>Daftar akun & dapatkan API key.</span></div>
-    <div><b>02</b><span>Beli coin dan tunggu approval pembayaran.</span></div>
-    <div><b>03</b><span>Kirim request ke endpoint domain Anda.</span></div>
+    <div><b>02</b><span>Pilih paket coin dan lakukan pembayaran.</span></div>
+    <div><b>03</b><span>Tunggu approval pembayaran.</span></div>
     <div><b>04</b><span>1 request sukses = 1 coin.</span></div>
   </div>
 </section>
 </main>
 <footer>Reaction API Gateway · Built for your own domain</footer>
+<script>
+(async function loadPricing(){
+  const box = document.getElementById('pricingCards');
+  try {
+    const r = await fetch('/api/packages');
+    const data = await r.json();
+    if (!data.success) throw new Error(data.error || 'Gagal memuat paket');
+    box.innerHTML = data.packages.map((p, i) => `
+      <div class="price-card${i === 1 ? ' featured' : ''}">
+        <div class="tag">${p.name.toUpperCase()}</div>
+        <h3>${Number(p.coins).toLocaleString('id-ID')} Coin</h3>
+        <strong>Rp${Number(p.price).toLocaleString('id-ID')}</strong>
+        <p>${p.description || ''}</p>
+        <a class="btn full" href="/register.html">Pilih</a>
+      </div>
+    `).join('');
+  } catch (e) {
+    box.innerHTML = '<div class="price-card"><div class="tag">ERROR</div><h3>Paket gagal dimuat</h3><p>Silakan refresh halaman.</p></div>';
+  }
+})();
+</script>
 </body>
 </html>

@@ -34,6 +34,23 @@ const PORT = Number(process.env.PORT || 3000);
 
 const COIN_UNIT = Math.max(1, Number(process.env.COIN_UNIT || 100));
 const COIN_UNIT_PRICE = Math.max(0, Number(process.env.COIN_UNIT_PRICE || 5000));
+
+// Paket penjualan — bisa diatur sendiri lewat .env / Vercel Environment Variables.
+// Permanen default: 999.999 coin dan aktif selamanya.
+const PACKAGE_CONFIG = {
+  permanent: {
+    coins: Math.max(1, Number(process.env.PACKAGE_PERMANENT_COINS || 999999)),
+    price: Math.max(0, Number(process.env.PACKAGE_PERMANENT_PRICE || 5000000))
+  },
+  "30_days": {
+    coins: Math.max(1, Number(process.env.PACKAGE_30D_COINS || 1000)),
+    price: Math.max(0, Number(process.env.PACKAGE_30D_PRICE || 50000))
+  },
+  "7_days": {
+    coins: Math.max(1, Number(process.env.PACKAGE_7D_COINS || 500)),
+    price: Math.max(0, Number(process.env.PACKAGE_7D_PRICE || 25000))
+  }
+};
 const MAX_UPLOAD_MB = Math.max(1, Number(process.env.MAX_UPLOAD_MB || 5));
 
 function id(prefix = "") {
@@ -196,14 +213,18 @@ function calculateCoinExpiry(currentExpiry, duration) {
 
 function packageOptions() {
   return [
-    { id: "permanent", name: "Permanen", duration: "permanent" },
-    { id: "30_days", name: "30 Hari", duration: "30_days" },
-    { id: "7_days", name: "7 Hari", duration: "7_days" }
+    { id: "permanent", name: "Permanen", duration: "permanent", coins: PACKAGE_CONFIG.permanent.coins, price: PACKAGE_CONFIG.permanent.price, description: "999.999 coin, aktif selamanya." },
+    { id: "30_days", name: "30 Hari", duration: "30_days", coins: PACKAGE_CONFIG["30_days"].coins, price: PACKAGE_CONFIG["30_days"].price, description: "Aktif 30 hari sejak paket disetujui." },
+    { id: "7_days", name: "7 Hari", duration: "7_days", coins: PACKAGE_CONFIG["7_days"].coins, price: PACKAGE_CONFIG["7_days"].price, description: "Aktif 7 hari sejak paket disetujui." }
   ];
 }
 
 function packagePrice(coins) {
   return Math.ceil(Number(coins) / COIN_UNIT) * COIN_UNIT_PRICE;
+}
+
+function packageByDuration(duration) {
+  return PACKAGE_CONFIG[duration] || null;
 }
 
 const upload = multer({
@@ -410,8 +431,16 @@ app.get("/api/packages", (_, res) => {
 
 app.post("/api/orders", auth, async (req, res) => {
   try {
-    const coins = Number(req.body.coins);
     const duration = String(req.body.duration || "permanent");
+    const selectedPackage = packageByDuration(duration);
+    if (!selectedPackage) {
+      return res.status(400).json({ success: false, error: "INVALID_DURATION" });
+    }
+
+    // Untuk paket permanen/30 hari/7 hari, coin & harga mengikuti konfigurasi paket.
+    // Custom tetap boleh mengirim jumlah coin sendiri melalui requestedCoins.
+    const requestedCoins = req.body.coins == null || req.body.coins === "" ? null : Number(req.body.coins);
+    const coins = requestedCoins == null ? selectedPackage.coins : requestedCoins;
 
     if (!Number.isInteger(coins) || coins < 100) {
       return res.status(400).json({
@@ -420,17 +449,12 @@ app.post("/api/orders", auth, async (req, res) => {
       });
     }
 
-    if (coins % 100 !== 0) {
+    // 999.999 coin permanen memang bukan kelipatan 100, jadi paket permanen
+    // dikecualikan dari aturan kelipatan 100. Paket durasi tetap mengikuti konfigurasi.
+    if (duration !== "permanent" && coins % 100 !== 0) {
       return res.status(400).json({
         success: false,
         error: "COINS_MUST_BE_MULTIPLE_OF_100"
-      });
-    }
-
-    if (!["permanent", "7_days", "30_days"].includes(duration)) {
-      return res.status(400).json({
-        success: false,
-        error: "INVALID_DURATION"
       });
     }
 
@@ -441,7 +465,7 @@ app.post("/api/orders", auth, async (req, res) => {
       .insert({
         user_id: req.user.id,
         coins,
-        price: packagePrice(coins),
+        price: requestedCoins == null ? selectedPackage.price : packagePrice(coins),
         duration,
         status: "pending",
         payment_proof: null,
