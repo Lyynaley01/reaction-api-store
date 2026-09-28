@@ -1030,7 +1030,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: "INTERNAL_SERVER_ERROR" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Reaction API Store aktif di http://127.0.0.1:${PORT}`);
-  console.log(`Upstream: ${process.env.ZXC_API_URL || "(belum diatur)"}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Reaction API Store aktif di http://127.0.0.1:${PORT}`);
+    console.log(`Upstream: ${process.env.ZXC_API_URL || "(belum diatur)"}`);
+  });
+}
+
+module.exports = app;
