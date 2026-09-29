@@ -342,6 +342,98 @@ async function loadOrders() {
 
 
 /* =========================
+   DELETE ALL ORDERS
+========================= */
+
+function openDeleteOrdersModal() {
+  const modal = $("deleteOrdersModal");
+  if (!modal) return;
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeDeleteOrdersModal() {
+  const modal = $("deleteOrdersModal");
+  if (!modal) return;
+
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+async function deleteAllOrders() {
+  const button = $("confirmDeleteOrders");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Menghapus...";
+  }
+
+  try {
+    const r = await api("/api/orders", "DELETE");
+
+    if (!r.success) {
+      toast(
+        r.message || r.error || "Gagal menghapus riwayat order.",
+        "error",
+        "Orders"
+      );
+      return;
+    }
+
+    closeDeleteOrdersModal();
+
+    const container = $("ordersList");
+
+    if (container) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Belum ada order.
+        </div>
+      `;
+    }
+
+    toast(
+      "Semua riwayat order berhasil dihapus.",
+      "success",
+      "Orders Dihapus"
+    );
+  } catch (err) {
+    console.error("[Delete Orders]", err);
+
+    toast(
+      "Gagal menghapus riwayat order.",
+      "error",
+      "Orders"
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Hapus Semua";
+    }
+  }
+}
+
+$("deleteAllOrders")?.addEventListener(
+  "click",
+  openDeleteOrdersModal
+);
+
+$("cancelDeleteOrders")?.addEventListener(
+  "click",
+  closeDeleteOrdersModal
+);
+
+document
+  .querySelector("[data-close-orders-history]")
+  ?.addEventListener("click", closeDeleteOrdersModal);
+
+$("confirmDeleteOrders")?.addEventListener(
+  "click",
+  deleteAllOrders
+);
+
+/* =========================
    PAYMENT PROOF
 ========================= */
 
@@ -511,9 +603,7 @@ async function deleteAllHistory() {
   }
 
   try {
-    const r = await api("/api/usage", {
-      method: "DELETE"
-    });
+    const r = await api("/api/usage", "DELETE");
 
     if (!r.success) {
       toast(

@@ -564,6 +564,46 @@ app.get("/api/orders", auth, async (req, res) => {
   }
 });
 
+app.delete("/api/orders", auth, async (req, res) => {
+  try {
+    const { data: orders, error: fetchError } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("user_id", req.user.id);
+
+    if (fetchError) throw fetchError;
+
+    const ids = (orders || []).map(order => order.id);
+
+    if (!ids.length) {
+      return res.json({
+        success: true,
+        message: "Semua riwayat order sudah kosong."
+      });
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .delete()
+      .eq("user_id", req.user.id);
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      message: "Semua riwayat order berhasil dihapus."
+    });
+  } catch (err) {
+    console.error("[Orders Delete]", err);
+
+    return res.status(500).json({
+      success: false,
+      error: "ORDERS_DELETE_FAILED",
+      message: "Gagal menghapus riwayat order."
+    });
+  }
+});
+
 app.post("/api/orders/:id/proof", auth, upload.single("proof"), async (req, res) => {
   try {
     const { data: order, error: orderError } = await supabase

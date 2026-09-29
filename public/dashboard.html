@@ -141,8 +141,19 @@
       <div>
         <div class="eyebrow">HISTORY</div>
         <h2>Orders</h2>
+        <p class="history-usage-subtitle">
+          Riwayat pembelian coin akun kamu.
+        </p>
       </div>
     </div>
+
+    <button
+      id="deleteAllOrders"
+      class="btn small history-delete-btn"
+      type="button"
+    >
+      Hapus Semua
+    </button>
 
     <div id="ordersList" class="dashboard-list">
       Loading orders...
@@ -175,6 +186,42 @@
   </section>
 
 </main>
+
+<div id="deleteOrdersModal" class="admin-modal dashboard-confirm-modal" aria-hidden="true">
+  <div class="admin-modal-backdrop" data-close-orders-history></div>
+
+  <div class="admin-modal-card">
+    <div class="admin-modal-icon">!</div>
+
+    <div class="admin-modal-content">
+      <div class="eyebrow">ORDER HISTORY</div>
+      <h3>Hapus Semua Order?</h3>
+
+      <p>
+        Semua riwayat pembelian coin akun ini akan dihapus
+        secara permanen dan tidak dapat dikembalikan.
+      </p>
+
+      <div class="admin-modal-actions">
+        <button
+          type="button"
+          class="btn small secondary-btn"
+          id="cancelDeleteOrders"
+        >
+          Batal
+        </button>
+
+        <button
+          type="button"
+          class="btn small danger"
+          id="confirmDeleteOrders"
+        >
+          Hapus Semua
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="deleteHistoryModal" class="admin-modal dashboard-confirm-modal" aria-hidden="true">
   <div class="admin-modal-backdrop" data-close-history></div>
