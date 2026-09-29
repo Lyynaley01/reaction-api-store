@@ -433,15 +433,40 @@ app.get("/api/packages", (_, res) => {
 app.post("/api/orders", auth, async (req, res) => {
   try {
     const duration = String(req.body.duration || "permanent");
+    const isCustom = req.body.custom === true || req.body.custom === "true";
+
     const selectedPackage = packageByDuration(duration);
     if (!selectedPackage) {
-      return res.status(400).json({ success: false, error: "INVALID_DURATION" });
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_DURATION"
+      });
     }
 
-    // Coin dan harga selalu mengikuti konfigurasi paket.
-    // Nilai coins dari frontend tidak boleh mengubah harga paket.
-    const coins = selectedPackage.coins;
-    const price = selectedPackage.price;
+    let coins;
+    let price;
+
+    if (isCustom) {
+      const requestedCoins = Number(req.body.coins);
+
+      if (
+        !Number.isInteger(requestedCoins) ||
+        requestedCoins < 100 ||
+        requestedCoins % 50 !== 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: "INVALID_CUSTOM_COINS",
+          message: "Custom coins minimal 100 dan harus kelipatan 50."
+        });
+      }
+
+      coins = requestedCoins;
+      price = packagePrice(coins);
+    } else {
+      coins = selectedPackage.coins;
+      price = selectedPackage.price;
+    }
 
     const createdAt = now();
 

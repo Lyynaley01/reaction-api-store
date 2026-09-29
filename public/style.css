@@ -1538,3 +1538,221 @@ footer {
     align-items: center;
   }
 }
+
+/* ===== DASHBOARD HEADER ===== */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 22px;
+  box-sizing: border-box;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.topbar .brand {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.topbar nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.topbar nav a,
+.topbar nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 11px;
+  box-sizing: border-box;
+}
+
+.topbar nav a {
+  text-decoration: none;
+}
+
+.topbar .ghost-btn {
+  cursor: pointer;
+}
+
+/* ===== PACKAGE CAROUSEL ===== */
+
+.package-carousel {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 16px !important;
+  width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  padding: 4px 4px 18px !important;
+  box-sizing: border-box;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: thin;
+}
+
+.package-carousel > * {
+  flex: 0 0 min(330px, calc(100vw - 56px)) !important;
+  width: min(330px, calc(100vw - 56px)) !important;
+  min-width: min(330px, calc(100vw - 56px)) !important;
+  scroll-snap-align: start;
+  box-sizing: border-box;
+}
+
+/* ===== CUSTOM COINS ===== */
+
+.custom-package-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.package-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.package-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.package-icon {
+  font-size: 19px;
+  opacity: .8;
+}
+
+.custom-fields {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.custom-field {
+  display: grid;
+  gap: 7px;
+}
+
+.custom-field > span {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: .72;
+}
+
+.custom-field small {
+  font-size: 11px;
+  opacity: .5;
+}
+
+.coin-input-wrap {
+  position: relative;
+}
+
+.coin-input-wrap input,
+.custom-field select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 0 13px;
+  box-sizing: border-box;
+  outline: none;
+  background: rgba(255,255,255,.035);
+  color: inherit;
+  font: inherit;
+}
+
+.coin-input-wrap input {
+  padding-right: 68px;
+}
+
+.coin-input-wrap span {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  opacity: .45;
+  pointer-events: none;
+}
+
+.custom-field select {
+  appearance: auto;
+}
+
+.custom-price-box {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 16px;
+  padding: 12px 13px;
+  border-radius: 13px;
+  background: rgba(255,255,255,.035);
+}
+
+.custom-price-box small {
+  font-size: 10px;
+  letter-spacing: .12em;
+  opacity: .48;
+}
+
+.custom-price-box strong {
+  font-size: 21px;
+}
+
+.custom-buy-btn {
+  width: 100%;
+  min-height: 45px;
+  cursor: pointer;
+}
+
+.custom-buy-btn:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    padding: 12px 15px;
+  }
+
+  .topbar nav {
+    gap: 6px;
+  }
+
+  .topbar nav a,
+  .topbar nav button {
+    min-height: 35px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .package-carousel {
+    padding-right: 15px !important;
+  }
+}
