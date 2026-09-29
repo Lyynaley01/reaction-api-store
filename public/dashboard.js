@@ -4,83 +4,219 @@ let me = null;
 let packages = [];
 
 async function load() {
-  const r = await api("/api/me");
+  try {
+    const r = await api("/api/me");
 
-  if (!r.success) {
-    location.href = "/login.html";
-    return;
+    if (!r.success || !r.user) {
+      localStorage.removeItem("token");
+      location.href = "/login.html";
+      return;
+    }
+
+    me = r.user;
+
+    // COINS
+    const coins = $("coins");
+    if (coins) {
+      coins.textContent =
+        Number(me.coins || 0).toLocaleString("id-ID");
+    }
+
+    // API KEY
+    const apiKey = $("apiKey");
+    if (apiKey) {
+      apiKey.textContent = me.apiKey || "—";
+    }
+
+    // Load semua data
+    await Promise.all([
+      loadDashboardStats(),
+      loadPackages(),
+      loadOrders(),
+      loadUsage()
+    ]);
+
+  } catch (err) {
+    console.error("[Dashboard]", err);
+
+    toast(
+      "Gagal memuat dashboard. Silakan refresh halaman.",
+      "error",
+      "Dashboard Error"
+    );
   }
-
-  me = r.user;
-
-  $("hello").textContent = "Hi, " + (me.name || me.email);
-  $("coins").textContent = Number(me.coins || 0).toLocaleString("id-ID");
-  $("key").textContent = me.apiKey || "—";
-
-  await loadPackages();
-  await loadOrders();
-  await loadUsage();
-  await loadDashboardStats();
 }
+
+
+/* =========================
+   DASHBOARD STATS
+========================= */
+
+async function loadDashboardStats() {
+  try {
+    const r = await api("/api/dashboard/stats");
+
+    if (!r.success) {
+      console.error("[Dashboard Stats]", r.error);
+      return;
+    }
+
+    const total = $("totalReactions");
+
+    if (total) {
+      total.textContent =
+        Number(r.totalReactions || 0).toLocaleString("id-ID");
+    }
+
+  } catch (err) {
+    console.error("[Dashboard Stats]", err);
+  }
+}
+
+
+/* =========================
+   PACKAGES
+========================= */
 
 async function loadPackages() {
-  const r = await api("/api/packages");
+  const container = $("packagesList");
 
-  if (!r.success) {
-    toast(r.error || "Gagal memuat paket.", "error");
-    return;
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="dashboard-loading">
+      Memuat paket...
+    </div>
+  `;
+
+  try {
+    const r = await api("/api/packages");
+
+    if (!r.success) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Gagal memuat paket.
+        </div>
+      `;
+      return;
+    }
+
+    packages = r.packages || [];
+
+    if (!packages.length) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Belum ada paket tersedia.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = packages.map(p => `
+      <article class="package-card">
+
+        <div class="package-card-top">
+          <div>
+            <div class="package-name">
+              ${escapeHtml(p.name)}
+            </div>
+
+            <div class="package-duration">
+              ${
+                p.duration === "permanent"
+                  ? "AKTIF SELAMANYA"
+                  : escapeHtml(
+                      p.duration === "30_days"
+                        ? "30 HARI"
+                        : "7 HARI"
+                    )
+              }
+            </div>
+          </div>
+
+          <div class="package-icon">◈</div>
+        </div>
+
+        <div class="package-coins">
+          ${Number(p.coins || 0).toLocaleString("id-ID")}
+          <span>coin</span>
+        </div>
+
+        <div class="package-description">
+          ${escapeHtml(p.description || "")}
+        </div>
+
+        <div class="package-bottom">
+
+          <strong>
+            Rp${Number(p.price || 0).toLocaleString("id-ID")}
+          </strong>
+
+          <button
+            class="package-buy"
+            type="button"
+            onclick="createOrder('${escapeHtml(p.duration)}')"
+          >
+            Beli →
+          </button>
+
+        </div>
+
+      </article>
+    `).join("");
+
+  } catch (err) {
+    console.error("[Packages]", err);
+
+    container.innerHTML = `
+      <div class="dashboard-empty">
+        Gagal terhubung ke server.
+      </div>
+    `;
   }
-
-  packages = r.packages || [];
-
-  const select = $("duration");
-
-  select.innerHTML = packages
-    .map(p => `<option value="${p.duration}">${p.name}</option>`)
-    .join("");
-
-  select.onchange = updatePrice;
-
-  updatePrice();
 }
 
-function updatePrice() {
+
+/* =========================
+   CREATE ORDER
+========================= */
+
+async function createOrder(duration) {
   const p = packages.find(
-    x => x.duration === $("duration").value
-  );
-
-  if (!p) return;
-
-  $("buyCoins").value = p.coins;
-  $("buyCoins").readOnly = true;
-  $("packageInfo").textContent = p.description || "";
-
-  $("price").textContent =
-    "Rp" + Number(p.price).toLocaleString("id-ID");
-}
-
-async function createOrder() {
-  const p = packages.find(
-    x => x.duration === $("duration").value
+    x => x.duration === duration
   );
 
   if (!p) {
-    toast("Paket tidak ditemukan.", "error");
+    toast(
+      "Paket tidak ditemukan.",
+      "error"
+    );
     return;
   }
 
-  const r = await api("/api/orders", "POST", {
-    coins: p.coins,
-    duration: p.duration
-  });
+  const confirmed = await confirmModal(
+    `Buat order ${p.name} dengan ${Number(p.coins).toLocaleString("id-ID")} coin seharga Rp${Number(p.price).toLocaleString("id-ID")}?`,
+    "Konfirmasi Pembelian"
+  );
+
+  if (!confirmed) return;
+
+  const r = await api(
+    "/api/orders",
+    "POST",
+    {
+      coins: p.coins,
+      duration: p.duration
+    }
+  );
 
   if (!r.success) {
-    toast(r.error || "Gagal membuat order.", "error");
+    toast(
+      r.error || "Gagal membuat order.",
+      "error"
+    );
     return;
   }
-
-  $("orderMsg").textContent =
-    `Order ${r.order.id} dibuat. Total Rp${Number(r.order.price).toLocaleString("id-ID")}. Upload bukti setelah pembayaran.`;
 
   toast(
     `Order ${r.order.id} berhasil dibuat.`,
@@ -91,48 +227,103 @@ async function createOrder() {
   await loadOrders();
 }
 
+
+/* =========================
+   ORDERS
+========================= */
+
 async function loadOrders() {
-  const r = await api("/api/orders");
+  const container = $("ordersList");
 
-  if (!r.success) {
-    $("orders").textContent = "Gagal memuat order.";
-    return;
-  }
+  if (!container) return;
 
-  $("orders").innerHTML =
-    r.orders?.length
-      ? r.orders.map(o => `
-          <div class="row">
-            <div>
-              <b>${escapeHtml(o.id)}</b>
-              <br>
-              ${Number(o.coins).toLocaleString("id-ID")} coin
-              · ${escapeHtml(o.duration)}
-              · Rp${Number(o.price).toLocaleString("id-ID")}
-            </div>
+  container.innerHTML = `
+    <div class="dashboard-loading">
+      Memuat orders...
+    </div>
+  `;
 
-            <span class="status ${escapeHtml(o.status)}">
-              ${escapeHtml(o.status)}
-            </span>
+  try {
+    const r = await api("/api/orders");
 
-            ${
-              o.status === "pending"
-                ? `
-                  <label class="upload">
-                    Upload bukti
-                    <input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onchange="proof('${escapeHtml(o.id)}',this.files[0])"
-                    >
-                  </label>
-                `
-                : ""
-            }
+    if (!r.success) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Gagal memuat orders.
+        </div>
+      `;
+      return;
+    }
+
+    const orders = r.orders || [];
+
+    if (!orders.length) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Belum ada order.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = orders.map(o => `
+      <div class="order-card">
+
+        <div class="order-main">
+
+          <div class="order-id">
+            ${escapeHtml(o.id)}
           </div>
-        `).join("")
-      : "Belum ada order.";
+
+          <div class="order-info">
+            ${Number(o.coins || 0).toLocaleString("id-ID")} coin
+            · ${escapeHtml(o.duration)}
+            · Rp${Number(o.price || 0).toLocaleString("id-ID")}
+          </div>
+
+        </div>
+
+        <div class="order-side">
+
+          <span class="status ${escapeHtml(o.status)}">
+            ${escapeHtml(o.status)}
+          </span>
+
+          ${
+            o.status === "pending"
+              ? `
+                <label class="upload-btn">
+                  Upload Bukti
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onchange="proof('${escapeHtml(o.id)}', this.files[0])"
+                  >
+                </label>
+              `
+              : ""
+          }
+
+        </div>
+
+      </div>
+    `).join("");
+
+  } catch (err) {
+    console.error("[Orders]", err);
+
+    container.innerHTML = `
+      <div class="dashboard-empty">
+        Gagal memuat orders.
+      </div>
+    `;
+  }
 }
+
+
+/* =========================
+   PAYMENT PROOF
+========================= */
 
 async function proof(id, file) {
   if (!file) return;
@@ -140,96 +331,147 @@ async function proof(id, file) {
   const fd = new FormData();
   fd.append("proof", file);
 
-  const r = await fetch(
-    "/api/orders/" + encodeURIComponent(id) + "/proof",
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + localStorage.token
-      },
-      body: fd
-    }
-  );
-
-  const j = await r.json().catch(() => ({
-    success: false,
-    error: "INVALID_SERVER_RESPONSE"
-  }));
-
-  if (!j.success) {
-    toast(j.error || "Upload bukti gagal.", "error");
-    return;
-  }
-
-  toast(
-    "Bukti pembayaran berhasil dikirim.",
-    "success",
-    "Bukti Terkirim"
-  );
-
-  await loadOrders();
-}
-
-async function loadDashboardStats() {
   try {
-    const r = await api("/api/dashboard/stats");
-
-    if (r.success && $("totalReactions")) {
-      $("totalReactions").textContent =
-        Number(r.totalReactions || 0).toLocaleString("id-ID");
-    }
-  } catch (err) {
-    console.error("Dashboard stats:", err);
-  }
-}
-
-async function loadUsage() {
-  const r = await api("/api/usage");
-
-  if (!r.success) {
-    $("usage").textContent = "Gagal memuat riwayat.";
-    return;
-  }
-
-  $("usage").innerHTML =
-    r.usage?.length
-      ? r.usage.map(x => `
-          <div class="row">
-            <div>
-              <b>${escapeHtml(x.reaction)}</b>
-              · ${escapeHtml(x.status)}
-              <br>
-              <small>${escapeHtml(x.url)}</small>
-            </div>
-
-            <span>
-              ${Number(x.coinUsed || 0).toLocaleString("id-ID")} coin
-            </span>
-          </div>
-        `).join("")
-      : "Belum ada penggunaan.";
-}
-
-async function copyText(text, label="Teks") {
-  try {
-    await navigator.clipboard.writeText(text);
-
-    toast(
-      `${label} berhasil disalin.`,
-      "success",
-      "Disalin"
+    const r = await fetch(
+      "/api/orders/" +
+      encodeURIComponent(id) +
+      "/proof",
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            "Bearer " + localStorage.token
+        },
+        body: fd
+      }
     );
-  } catch {
+
+    const j = await r.json().catch(() => ({
+      success: false,
+      error: "INVALID_SERVER_RESPONSE"
+    }));
+
+    if (!j.success) {
+      toast(
+        j.error || "Upload bukti gagal.",
+        "error"
+      );
+      return;
+    }
+
     toast(
-      `Gagal menyalin ${label.toLowerCase()}.`,
+      "Bukti pembayaran berhasil dikirim.",
+      "success",
+      "Bukti Terkirim"
+    );
+
+    await loadOrders();
+
+  } catch (err) {
+    console.error("[Proof]", err);
+
+    toast(
+      "Tidak dapat menghubungi server.",
       "error"
     );
   }
 }
 
+
+/* =========================
+   USAGE
+========================= */
+
+async function loadUsage() {
+  const container = $("usage");
+
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="dashboard-loading">
+      Memuat usage...
+    </div>
+  `;
+
+  try {
+    const r = await api("/api/usage");
+
+    if (!r.success) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Gagal memuat riwayat.
+        </div>
+      `;
+      return;
+    }
+
+    const usage = r.usage || [];
+
+    if (!usage.length) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Belum ada penggunaan API.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = usage.map(x => `
+      <div class="usage-card">
+
+        <div class="usage-main">
+
+          <div class="usage-reaction">
+            ${escapeHtml(x.reaction || "—")}
+          </div>
+
+          <div class="usage-url">
+            ${escapeHtml(x.url || x.target_url || "—")}
+          </div>
+
+        </div>
+
+        <div class="usage-side">
+
+          <span class="status ${escapeHtml(x.status || "")}">
+            ${escapeHtml(x.status || "unknown")}
+          </span>
+
+          <small>
+            ${Number(
+              x.coinUsed ??
+              x.coins_used ??
+              0
+            ).toLocaleString("id-ID")} coin
+          </small>
+
+        </div>
+
+      </div>
+    `).join("");
+
+  } catch (err) {
+    console.error("[Usage]", err);
+
+    container.innerHTML = `
+      <div class="dashboard-empty">
+        Gagal memuat usage.
+      </div>
+    `;
+  }
+}
+
+
+/* =========================
+   API KEY
+========================= */
+
 function copyKey() {
   if (!me?.apiKey) {
-    toast("API key belum tersedia.", "error");
+    toast(
+      "API key belum tersedia.",
+      "error"
+    );
     return;
   }
 
@@ -238,7 +480,7 @@ function copyKey() {
 
 async function regen() {
   const confirmed = await confirmModal(
-    "API key lama akan langsung tidak berlaku. Semua aplikasi yang menggunakan key lama harus diperbarui.",
+    "API key lama akan langsung tidak berlaku.",
     "Regenerate API Key?"
   );
 
@@ -258,22 +500,60 @@ async function regen() {
   }
 
   me.apiKey = r.apiKey;
-  $("key").textContent = r.apiKey;
+
+  const key = $("apiKey");
+
+  if (key) {
+    key.textContent = r.apiKey;
+  }
 
   toast(
     "API key baru berhasil dibuat.",
     "success",
-    "API Key Diperbarui"
+    "API Key Updated"
   );
 }
 
+
+/* =========================
+   COPY
+========================= */
+
+async function copyText(text, label = "Teks") {
+  try {
+    await navigator.clipboard.writeText(text);
+
+    toast(
+      `${label} berhasil disalin.`,
+      "success",
+      "Disalin"
+    );
+
+  } catch {
+    toast(
+      `Gagal menyalin ${label.toLowerCase()}.`,
+      "error"
+    );
+  }
+}
+
+
+/* =========================
+   HTML ESCAPE
+========================= */
+
 function escapeHtml(value) {
   return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
+
+
+/* =========================
+   START
+========================= */
 
 load();
