@@ -94,25 +94,40 @@
     const price = card.querySelector("#customPrice");
     const button = card.querySelector(".custom-buy-btn");
 
+    function updatePrice() {
+      const raw = input.value.trim();
+
+      if (!raw) {
+        price.textContent = money(priceFor(MIN_COINS));
+        return;
+      }
+
+      const value = Number(raw);
+
+      if (Number.isFinite(value) && value >= MIN_COINS) {
+        price.textContent = money(priceFor(value));
+      }
+    }
+
     function normalize() {
       let value = Number(input.value);
 
-      if (!Number.isFinite(value)) value = MIN_COINS;
+      if (!Number.isFinite(value) || value < MIN_COINS) {
+        value = MIN_COINS;
+      }
 
-      value = Math.floor(value);
+      value = Math.floor(value / STEP_COINS) * STEP_COINS;
 
-      if (value < MIN_COINS) value = MIN_COINS;
-
-      value = Math.round(value / STEP_COINS) * STEP_COINS;
-
-      if (value < MIN_COINS) value = MIN_COINS;
+      if (value < MIN_COINS) {
+        value = MIN_COINS;
+      }
 
       input.value = value;
       price.textContent = money(priceFor(value));
     }
 
-    input.addEventListener("input", normalize);
-    input.addEventListener("change", normalize);
+    input.addEventListener("input", updatePrice);
+    input.addEventListener("blur", normalize);
 
     button.addEventListener("click", async () => {
       normalize();
