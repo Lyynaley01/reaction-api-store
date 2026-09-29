@@ -155,8 +155,19 @@
       <div>
         <div class="eyebrow">ACTIVITY</div>
         <h2>Recent Usage</h2>
+        <p class="history-usage-subtitle">
+          Riwayat penggunaan API akun kamu.
+        </p>
       </div>
     </div>
+
+    <button
+      id="deleteAllHistory"
+      class="btn small history-delete-btn"
+      type="button"
+    >
+      Hapus Semua
+    </button>
 
     <div id="usage" class="dashboard-list">
       Loading usage...
@@ -164,6 +175,42 @@
   </section>
 
 </main>
+
+<div id="deleteHistoryModal" class="admin-modal dashboard-confirm-modal" aria-hidden="true">
+  <div class="admin-modal-backdrop" data-close-history></div>
+
+  <div class="admin-modal-card">
+    <div class="admin-modal-icon">!</div>
+
+    <div class="admin-modal-content">
+      <div class="eyebrow">ACTIVITY HISTORY</div>
+      <h3>Hapus Semua Riwayat?</h3>
+
+      <p>
+        Semua riwayat penggunaan API akun ini akan dihapus
+        secara permanen dan tidak dapat dikembalikan.
+      </p>
+
+      <div class="admin-modal-actions">
+        <button
+          type="button"
+          class="btn small secondary-btn"
+          id="cancelDeleteHistory"
+        >
+          Batal
+        </button>
+
+        <button
+          type="button"
+          class="btn small danger"
+          id="confirmDeleteHistory"
+        >
+          Hapus Semua
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="toastWrap" class="toast-wrap"></div>
 

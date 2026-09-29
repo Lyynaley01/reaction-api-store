@@ -104,6 +104,62 @@
 </main>
 
 
+<!-- APPROVE MODAL -->
+<div id="approveModal" class="admin-modal" aria-hidden="true">
+  <div class="admin-modal-backdrop" data-close-approve></div>
+
+  <div class="admin-modal-card admin-approve-modal-card"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="approveModalTitle">
+
+    <div class="admin-modal-icon approve-icon">✓</div>
+
+    <div class="admin-modal-content">
+      <div class="eyebrow">ORDER ACTION</div>
+
+      <h3 id="approveModalTitle">
+        Setujui Pembelian?
+      </h3>
+
+      <p id="approveModalText">
+        Pembelian ini akan disetujui dan coin akan diberikan
+        kepada pengguna.
+      </p>
+
+      <div class="admin-approve-info">
+        <div>
+          <span>USER</span>
+          <strong id="approveUserName">—</strong>
+        </div>
+
+        <div>
+          <span>PEMBELIAN</span>
+          <strong id="approveOrderInfo">—</strong>
+        </div>
+      </div>
+
+      <div class="admin-modal-actions">
+        <button
+          type="button"
+          class="btn small secondary-btn"
+          id="cancelApprove"
+        >
+          Batal
+        </button>
+
+        <button
+          type="button"
+          class="btn small approve-btn"
+          id="confirmApprove"
+        >
+          Setujui Pembelian
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- REJECT MODAL -->
 <div id="rejectModal" class="admin-modal" aria-hidden="true">
   <div class="admin-modal-backdrop" data-close-reject></div>

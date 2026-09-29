@@ -2465,3 +2465,39 @@ footer {
     width: 88vw;
   }
 }
+
+
+/* =========================================
+   DASHBOARD — HISTORY ACTION
+   ========================================= */
+
+.history-usage-subtitle {
+  margin: 5px 0 0;
+  font-size: 12px;
+  opacity: .5;
+}
+
+.history-delete-btn {
+  display: block;
+  margin: 12px 0 14px auto;
+  flex-shrink: 0;
+  border-color: rgba(255, 91, 91, .18);
+  color: #ff8585;
+  background: rgba(255, 91, 91, .06);
+}
+
+.history-delete-btn:hover {
+  border-color: rgba(255, 91, 91, .30);
+  background: rgba(255, 91, 91, .10);
+}
+
+.dashboard-confirm-modal .admin-modal-card {
+  max-width: 460px;
+}
+
+@media (max-width: 600px) {
+  .history-delete-btn {
+    width: 100%;
+    margin: 12px 0;
+  }
+}

@@ -483,6 +483,100 @@ async function loadUsage() {
 
 
 /* =========================
+   DELETE ALL HISTORY
+========================= */
+
+function openDeleteHistoryModal() {
+  const modal = $("deleteHistoryModal");
+  if (!modal) return;
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeDeleteHistoryModal() {
+  const modal = $("deleteHistoryModal");
+  if (!modal) return;
+
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+async function deleteAllHistory() {
+  const button = $("confirmDeleteHistory");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Menghapus...";
+  }
+
+  try {
+    const r = await api("/api/usage", {
+      method: "DELETE"
+    });
+
+    if (!r.success) {
+      toast(
+        r.message || r.error || "Gagal menghapus riwayat.",
+        "error",
+        "History"
+      );
+      return;
+    }
+
+    closeDeleteHistoryModal();
+
+    const container = $("usage");
+
+    if (container) {
+      container.innerHTML = `
+        <div class="dashboard-empty">
+          Belum ada penggunaan API.
+        </div>
+      `;
+    }
+
+    toast(
+      "Semua riwayat berhasil dihapus.",
+      "success",
+      "History Dihapus"
+    );
+  } catch (err) {
+    console.error("[Delete History]", err);
+
+    toast(
+      "Gagal menghapus riwayat.",
+      "error",
+      "History"
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Hapus Semua";
+    }
+  }
+}
+
+$("deleteAllHistory")?.addEventListener(
+  "click",
+  openDeleteHistoryModal
+);
+
+$("cancelDeleteHistory")?.addEventListener(
+  "click",
+  closeDeleteHistoryModal
+);
+
+document
+  .querySelector("[data-close-history]")
+  ?.addEventListener("click", closeDeleteHistoryModal);
+
+$("confirmDeleteHistory")?.addEventListener(
+  "click",
+  deleteAllHistory
+);
+
+/* =========================
    API KEY
 ========================= */
 

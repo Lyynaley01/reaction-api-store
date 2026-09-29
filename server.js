@@ -673,6 +673,30 @@ async function getApiUser(req) {
 }
 
 
+app.delete("/api/usage", auth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from("usage_logs")
+      .delete()
+      .eq("user_id", req.user.id);
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      message: "Semua riwayat berhasil dihapus."
+    });
+  } catch (err) {
+    console.error("[Usage Delete]", err);
+
+    return res.status(500).json({
+      success: false,
+      error: "USAGE_DELETE_FAILED",
+      message: "Gagal menghapus riwayat."
+    });
+  }
+});
+
 app.get("/api/dashboard/stats", auth, async (req, res) => {
   try {
     const { count, error } = await supabase

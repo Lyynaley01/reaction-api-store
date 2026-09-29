@@ -226,7 +226,12 @@ function renderOrders(orders) {
                 ? `
                   <button
                     class="btn small"
-                    onclick="approve('${escapeHtml(x.id)}')"
+                    onclick="approve(
+                    '${escapeHtml(x.id)}',
+                    '${escapeHtml(name).replace("'", "\'")}',
+                    ${Number(x.coins || 0)},
+                    '${escapeHtml(duration).replace("'", "\'")}'
+                  )"
                   >
                     Approve
                   </button>
@@ -361,17 +366,99 @@ A("adminForm").onsubmit = async (e) => {
   }
 };
 
-async function approve(id) {
-  const r = await adminFetch(
-    "/api/admin/orders/" + encodeURIComponent(id) + "/approve",
-    {
-      method: "POST"
-    }
-  );
+let approveOrderId = null;
 
-  alert(r.message || r.error || "Selesai.");
-  loadAdmin();
+function openApproveModal(id, userName, coins, duration) {
+  const modal = A("approveModal");
+
+  if (!modal) return;
+
+  approveOrderId = id;
+
+  const nameEl = A("approveUserName");
+  const infoEl = A("approveOrderInfo");
+
+  if (nameEl) {
+    nameEl.textContent = userName || "Unknown User";
+  }
+
+  if (infoEl) {
+    infoEl.textContent =
+      `${Number(coins || 0).toLocaleString("id-ID")} coin · ${duration || "-"}`;
+  }
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
 }
+
+function closeApproveModal() {
+  const modal = A("approveModal");
+
+  if (!modal) return;
+
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  approveOrderId = null;
+}
+
+async function submitApproveOrder() {
+  if (!approveOrderId) return;
+
+  const button = A("confirmApprove");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Menyetujui...";
+  }
+
+  try {
+    const r = await adminFetch(
+      "/api/admin/orders/" +
+        encodeURIComponent(approveOrderId) +
+        "/approve",
+      {
+        method: "POST"
+      }
+    );
+
+    closeApproveModal();
+
+    if (r.success) {
+      loadAdmin();
+    } else {
+      alert(r.message || r.error || "Gagal menyetujui order.");
+    }
+  } catch (err) {
+    console.error("[Admin Approve]", err);
+
+    closeApproveModal();
+    alert("Gagal terhubung ke server.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Setujui Pembelian";
+    }
+  }
+}
+
+function approve(id, userName = "", coins = 0, duration = "") {
+  openApproveModal(id, userName, coins, duration);
+}
+
+A("cancelApprove")?.addEventListener(
+  "click",
+  closeApproveModal
+);
+
+document.querySelector("[data-close-approve]")?.addEventListener(
+  "click",
+  closeApproveModal
+);
+
+A("confirmApprove")?.addEventListener(
+  "click",
+  submitApproveOrder
+);
 
 let rejectOrderId = null;
 
