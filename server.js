@@ -228,13 +228,7 @@ function packageByDuration(duration) {
 }
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_, __, cb) => cb(null, UPLOAD_DIR),
-    filename: (_, file, cb) => {
-      const ext = path.extname(file.originalname || "").slice(0, 8);
-      cb(null, id("proof_") + ext);
-    }
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     const ok = /^(image\/(jpeg|png|webp)|application\/pdf)$/i.test(file.mimetype);
@@ -539,10 +533,23 @@ app.post("/api/orders/:id/proof", auth, upload.single("proof"), async (req, res)
       });
     }
 
+    const ext = path.extname(req.file.originalname || "").toLowerCase().slice(0, 8);
+    const safeExt = ext || ".bin";
+    const storagePath = `${req.user.id}/${order.id}/${id("proof_")}${safeExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("payment-proofs")
+      .upload(storagePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
     const { error: updateError } = await supabase
       .from("orders")
       .update({
-        payment_proof: req.file.filename,
+        payment_proof: storagePath,
         updated_at: now()
       })
       .eq("id", order.id);
@@ -881,11 +888,44 @@ app.get("/api/admin/orders", adminAuth, async (_, res) => {
   }
 });
 
-app.get("/api/admin/proof/:file", adminAuth, (req, res) => {
-  const file = path.basename(req.params.file);
-  const full = path.join(UPLOAD_DIR, file);
-  if (!fs.existsSync(full)) return res.sendStatus(404);
-  res.sendFile(full);
+app.get("/api/admin/proof/:file", adminAuth, async (req, res) => {
+  try {
+    const file = decodeURIComponent(req.params.file || "");
+
+    if (!file || file.includes("..")) {
+      return res.sendStatus(400);
+    }
+
+    const { data, error } = await supabase.storage
+      .from("payment-proofs")
+      .download(file);
+
+    if (error || !data) {
+      console.error("[Admin Proof Download]", error);
+      return res.sendStatus(404);
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+
+    const ext = path.extname(file).toLowerCase();
+    const contentTypes = {
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".webp": "image/webp",
+      ".pdf": "application/pdf"
+    };
+
+    res.setHeader(
+      "Content-Type",
+      contentTypes[ext] || "application/octet-stream"
+    );
+    res.setHeader("Content-Length", buffer.length);
+    res.send(buffer);
+  } catch (err) {
+    console.error("[Admin Proof]", err);
+    res.sendStatus(500);
+  }
 });
 
 app.post("/api/admin/orders/:id/approve", adminAuth, async (req, res) => {
