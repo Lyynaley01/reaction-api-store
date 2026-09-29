@@ -418,6 +418,32 @@ app.get("/api/me", auth, (req, res) => {
   res.json({ success: true, user: publicUser(req.user) });
 });
 
+app.put("/api/debug/profile-upload", auth, avatarUpload.single("avatar"), async (req, res) => {
+  console.log("[DEBUG PROFILE UPLOAD]", {
+    userId: req.user.id,
+    body: req.body,
+    hasFile: !!req.file,
+    file: req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    } : null
+  });
+
+  res.json({
+    success: true,
+    body: req.body,
+    hasFile: !!req.file,
+    file: req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    } : null
+  });
+});
+
 app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res) => {
   try {
     const name = String(req.body.name || "").trim();
