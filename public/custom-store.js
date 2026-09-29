@@ -2,7 +2,11 @@
   "use strict";
 
   const MIN_COINS = 100;
+  const MAX_COINS = 5000;
   const STEP_COINS = 50;
+
+  const MIN_DAYS = 3;
+  const MAX_DAYS = 30;
 
   let unitCoins = 100;
   let unitPrice = 5000;
@@ -39,6 +43,7 @@
 
   function createCustomCard() {
     const card = document.createElement("article");
+
     card.className = "package-card custom-package-card";
     card.dataset.customPackage = "true";
 
@@ -49,35 +54,53 @@
       </div>
 
       <h3>Custom Coins</h3>
+
       <p class="package-description">
-        Pilih jumlah coin dan durasi sesuai kebutuhan.
+        Atur jumlah coin dan masa aktif sesuai kebutuhan.
       </p>
 
-      <div class="custom-fields">
-        <label class="custom-field">
-          <span>Jumlah Coin</span>
-          <div class="coin-input-wrap">
-            <input
-              id="customCoins"
-              type="number"
-              min="100"
-              step="50"
-              value="100"
-              inputmode="numeric"
-            >
-            <span>COINS</span>
-          </div>
-          <small>Minimal 100 · kelipatan 50</small>
-        </label>
+      <div class="custom-slider-group">
+        <div class="custom-slider-head">
+          <span>COINS</span>
+          <strong id="customCoinsValue">100</strong>
+        </div>
 
-        <label class="custom-field">
-          <span>Durasi</span>
-          <select id="customDuration">
-            <option value="7_days">7 Hari</option>
-            <option value="30_days">30 Hari</option>
-            <option value="permanent">Permanen</option>
-          </select>
-        </label>
+        <input
+          id="customCoins"
+          class="custom-range"
+          type="range"
+          min="100"
+          max="5000"
+          step="50"
+          value="100"
+        >
+
+        <div class="custom-range-labels">
+          <span>100</span>
+          <span>5.000</span>
+        </div>
+      </div>
+
+      <div class="custom-slider-group">
+        <div class="custom-slider-head">
+          <span>MASA AKTIF</span>
+          <strong><span id="customDaysValue">3</span> Hari</strong>
+        </div>
+
+        <input
+          id="customDays"
+          class="custom-range"
+          type="range"
+          min="3"
+          max="30"
+          step="1"
+          value="3"
+        >
+
+        <div class="custom-range-labels">
+          <span>3 Hari</span>
+          <span>30 Hari</span>
+        </div>
       </div>
 
       <div class="custom-price-box">
@@ -90,54 +113,57 @@
       </button>
     `;
 
-    const input = card.querySelector("#customCoins");
+    const coinSlider = card.querySelector("#customCoins");
+    const coinValue = card.querySelector("#customCoinsValue");
+
+    const daySlider = card.querySelector("#customDays");
+    const dayValue = card.querySelector("#customDaysValue");
+
     const price = card.querySelector("#customPrice");
     const button = card.querySelector(".custom-buy-btn");
 
-    function updatePrice() {
-      const raw = input.value.trim();
+    function update() {
+      const coins = Number(coinSlider.value);
+      const days = Number(daySlider.value);
 
-      if (!raw) {
-        price.textContent = money(priceFor(MIN_COINS));
-        return;
-      }
-
-      const value = Number(raw);
-
-      if (Number.isFinite(value) && value >= MIN_COINS) {
-        price.textContent = money(priceFor(value));
-      }
+      coinValue.textContent = coins.toLocaleString("id-ID");
+      dayValue.textContent = days;
+      price.textContent = money(priceFor(coins));
     }
 
-    function normalize() {
-      let value = Number(input.value);
-
-      if (!Number.isFinite(value) || value < MIN_COINS) {
-        value = MIN_COINS;
-      }
-
-      value = Math.floor(value / STEP_COINS) * STEP_COINS;
-
-      if (value < MIN_COINS) {
-        value = MIN_COINS;
-      }
-
-      input.value = value;
-      price.textContent = money(priceFor(value));
-    }
-
-    input.addEventListener("input", updatePrice);
-    input.addEventListener("blur", normalize);
+    coinSlider.addEventListener("input", update);
+    daySlider.addEventListener("input", update);
 
     button.addEventListener("click", async () => {
-      normalize();
+      const coins = Number(coinSlider.value);
+      const days = Number(daySlider.value);
 
-      const coins = Number(input.value);
-      const duration = card.querySelector("#customDuration").value;
       const token = localStorage.getItem("token");
 
       if (!token) {
         location.href = "/login.html";
+        return;
+      }
+
+      if (
+        coins < MIN_COINS ||
+        coins > MAX_COINS ||
+        coins % STEP_COINS !== 0
+      ) {
+        toastMsg(
+          "Jumlah coin harus 100 sampai 5.000 dan kelipatan 50.",
+          "error",
+          "Invalid Coins"
+        );
+        return;
+      }
+
+      if (days < MIN_DAYS || days > MAX_DAYS) {
+        toastMsg(
+          "Masa aktif harus antara 3 sampai 30 hari.",
+          "error",
+          "Invalid Duration"
+        );
         return;
       }
 
@@ -154,7 +180,7 @@
           body: JSON.stringify({
             custom: true,
             coins,
-            duration
+            duration: `custom_${days}`
           })
         });
 
@@ -169,7 +195,7 @@
         }
 
         toastMsg(
-          `Order ${coins.toLocaleString("id-ID")} coin berhasil dibuat.`,
+          `Order ${coins.toLocaleString("id-ID")} coin · ${days} hari berhasil dibuat.`,
           "success",
           "Order Created"
         );
@@ -200,11 +226,14 @@
       }
     });
 
+    update();
+
     return card;
   }
 
   function enhancePackages() {
     const list = document.getElementById("packagesList");
+
     if (!list) return;
 
     list.classList.add("package-carousel");
@@ -218,6 +247,7 @@
     await loadPricing();
 
     const list = document.getElementById("packagesList");
+
     if (!list) return;
 
     enhancePackages();

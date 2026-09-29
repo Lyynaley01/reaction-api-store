@@ -205,7 +205,19 @@ function calculateCoinExpiry(currentExpiry, duration) {
     return null;
   }
 
-  const days = duration === "7_days" ? 7 : 30;
+  let days;
+
+  const customMatch = /^custom_(\d+)$/.exec(String(duration));
+
+  if (customMatch) {
+    days = Number(customMatch[1]);
+
+    if (!Number.isInteger(days) || days < 3 || days > 30) {
+      throw new Error("INVALID_CUSTOM_DURATION");
+    }
+  } else {
+    days = duration === "7_days" ? 7 : 30;
+  }
 
   const base =
     currentExpiry &&
@@ -435,8 +447,15 @@ app.post("/api/orders", auth, async (req, res) => {
     const duration = String(req.body.duration || "permanent");
     const isCustom = req.body.custom === true || req.body.custom === "true";
 
+    const customDurationMatch = /^custom_(\d+)$/.exec(duration);
+    const isCustomDuration =
+      !!customDurationMatch &&
+      Number(customDurationMatch[1]) >= 3 &&
+      Number(customDurationMatch[1]) <= 30;
+
     const selectedPackage = packageByDuration(duration);
-    if (!selectedPackage) {
+
+    if (!selectedPackage && !(isCustom && isCustomDuration)) {
       return res.status(400).json({
         success: false,
         error: "INVALID_DURATION"
@@ -452,12 +471,21 @@ app.post("/api/orders", auth, async (req, res) => {
       if (
         !Number.isInteger(requestedCoins) ||
         requestedCoins < 100 ||
+        requestedCoins > 5000 ||
         requestedCoins % 50 !== 0
       ) {
         return res.status(400).json({
           success: false,
           error: "INVALID_CUSTOM_COINS",
-          message: "Custom coins minimal 100 dan harus kelipatan 50."
+          message: "Custom coins harus 100 sampai 5.000 dan kelipatan 50."
+        });
+      }
+
+      if (!isCustomDuration) {
+        return res.status(400).json({
+          success: false,
+          error: "INVALID_CUSTOM_DURATION",
+          message: "Custom duration harus antara 3 sampai 30 hari."
         });
       }
 
@@ -482,26 +510,24 @@ app.post("/api/orders", auth, async (req, res) => {
         created_at: createdAt,
         updated_at: createdAt
       })
-      .select("*")
+      .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("[Order] Create error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "ORDER_CREATE_FAILED"
+      });
+    }
 
-    res.json({
+    return res.json({
       success: true,
-      order: {
-        ...order,
-        paymentInstructions: {
-          message:
-            "Bayar sesuai total lalu upload bukti pembayaran melalui dashboard.",
-          total: order.price
-        }
-      }
+      order
     });
-  } catch (err) {
-    console.error("[Create Order]", err);
-
-    res.status(500).json({
+  } catch (error) {
+    console.error("[Order] Error:", error);
+    return res.status(500).json({
       success: false,
       error: "ORDER_CREATE_FAILED"
     });

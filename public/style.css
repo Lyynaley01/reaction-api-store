@@ -1756,3 +1756,53 @@ footer {
     padding-right: 15px !important;
   }
 }
+
+/* Custom package sliders */
+.custom-slider-group {
+  margin: 20px 0;
+}
+
+.custom-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.custom-slider-head > span {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  opacity: .58;
+}
+
+.custom-slider-head strong {
+  font-size: 17px;
+}
+
+.custom-range {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  accent-color: currentColor;
+}
+
+.custom-range-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-size: 10px;
+  opacity: .45;
+}
+
+.custom-price-box {
+  margin-top: 20px;
+}
+
+.custom-buy-btn {
+  margin-top: 2px;
+}
