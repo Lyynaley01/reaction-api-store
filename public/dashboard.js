@@ -14,6 +14,7 @@ async function load() {
     }
 
     me = r.user;
+    renderProfile(me);
 
     // COINS
     const coins = $("coins");
