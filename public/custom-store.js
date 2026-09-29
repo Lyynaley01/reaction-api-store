@@ -18,8 +18,15 @@
       maximumFractionDigits: 0
     }).format(Number(value) || 0);
 
-  const priceFor = (coins) =>
-    Math.ceil(Number(coins) / unitCoins) * unitPrice;
+  const priceFor = (coins, days) => {
+    const basePrice =
+      Math.ceil(Number(coins) / unitCoins) * unitPrice;
+
+    const extraDayPrice =
+      Math.max(0, Number(days) - MIN_DAYS) * 1000;
+
+    return basePrice + extraDayPrice;
+  };
 
   async function loadPricing() {
     try {
@@ -105,7 +112,7 @@
 
       <div class="custom-price-box">
         <small>TOTAL HARGA</small>
-        <strong id="customPrice">${money(priceFor(100))}</strong>
+        <strong id="customPrice">${money(priceFor(100, 3))}</strong>
       </div>
 
       <button class="primary-btn custom-buy-btn" type="button">
@@ -128,7 +135,7 @@
 
       coinValue.textContent = coins.toLocaleString("id-ID");
       dayValue.textContent = days;
-      price.textContent = money(priceFor(coins));
+      price.textContent = money(priceFor(coins, days));
     }
 
     coinSlider.addEventListener("input", update);

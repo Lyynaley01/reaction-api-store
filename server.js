@@ -490,7 +490,12 @@ app.post("/api/orders", auth, async (req, res) => {
       }
 
       coins = requestedCoins;
-      price = packagePrice(coins);
+
+      const customDays = Number(customDurationMatch[1]);
+      const basePrice = packagePrice(coins);
+      const extraDayPrice = (customDays - 3) * 1000;
+
+      price = basePrice + extraDayPrice;
     } else {
       coins = selectedPackage.coins;
       price = selectedPackage.price;
