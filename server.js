@@ -716,7 +716,11 @@ app.get("/api/orders/:id/status", auth, async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      error: "ORDER_STATUS_FAILED"
+      error: "ORDER_STATUS_FAILED",
+      message: err.message || "Database error",
+      details: err.details || null,
+      hint: err.hint || null,
+      code: err.code || null
     });
   }
 });
@@ -1339,7 +1343,11 @@ app.post("/api/admin/orders/:id/reject", adminAuth, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      error: "ORDER_REJECT_FAILED"
+      error: "ORDER_REJECT_FAILED",
+      message: err.message || "Database error",
+      details: err.details || null,
+      hint: err.hint || null,
+      code: err.code || null
     });
   }
 });
