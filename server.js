@@ -1,3 +1,4 @@
+// AVATAR_DEPLOY_CHECK_20260929
 require("dotenv").config();
 
 const express = require("express");
