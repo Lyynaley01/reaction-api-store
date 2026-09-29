@@ -801,6 +801,13 @@ app.post("/api/admin/login", (req, res) => {
   const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || "");
 
+  console.log("[Admin Login Debug]", {
+    inputEmailLength: email.length,
+    inputPasswordLength: password.length,
+    envEmailLength: String(process.env.ADMIN_EMAIL || "").trim().toLowerCase().length,
+    envPasswordLength: String(process.env.ADMIN_PASSWORD || "").length
+  });
+
   if (
     email !== normalizeEmail(process.env.ADMIN_EMAIL || "") ||
     password !== String(process.env.ADMIN_PASSWORD || "")
