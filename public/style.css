@@ -1806,3 +1806,19 @@ footer {
 .custom-buy-btn {
   margin-top: 2px;
 }
+
+/* COIN EXPIRY */
+.coin-expiry {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  opacity: .65;
+}
+
+.coin-expiry span {
+  font-weight: 800;
+  opacity: 1;
+}
+

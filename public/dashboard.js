@@ -22,6 +22,26 @@ async function load() {
         Number(me.coins || 0).toLocaleString("id-ID");
     }
 
+    // COIN EXPIRY
+    const coinExpiry = $("coinExpiry");
+
+    if (coinExpiry) {
+      if (!me.coinExpiry) {
+        coinExpiry.textContent = "Permanent";
+      } else {
+        const expiry = new Date(me.coinExpiry);
+        const now = new Date();
+        const diff = expiry.getTime() - now.getTime();
+
+        if (diff <= 0) {
+          coinExpiry.textContent = "Expired";
+        } else {
+          const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+          coinExpiry.textContent = `${days} hari lagi`;
+        }
+      }
+    }
+
     // API KEY
     const apiKey = $("apiKey");
     if (apiKey) {
