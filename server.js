@@ -418,7 +418,7 @@ app.get("/api/me", auth, (req, res) => {
   res.json({ success: true, user: publicUser(req.user) });
 });
 
-app.put("/api/debug/profile-upload", auth, avatarUpload.single("avatar"), async (req, res) => {
+app.put("/api/debug/profile-upload", avatarUpload.single("avatar"), async (req, res) => {
   console.log("[DEBUG PROFILE UPLOAD]", {
     userId: req.user.id,
     body: req.body,
