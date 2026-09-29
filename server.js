@@ -422,6 +422,15 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
   try {
     const name = String(req.body.name || "").trim();
 
+    console.log("[Profile Update]", {
+      userId: req.user.id,
+      name,
+      hasFile: !!req.file,
+      fileName: req.file?.originalname || null,
+      fileType: req.file?.mimetype || null,
+      fileSize: req.file?.size || null
+    });
+
     if (name.length > 100) {
       return res.status(400).json({
         success: false,
@@ -458,8 +467,7 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
       const basePath = `${req.user.id}/avatar`;
       const storagePath = `${basePath}${ext}`;
 
-      // Hapus avatar lama dari kemungkinan ekstensi sebelumnya.
-      await supabase.storage
+      const { error: removeError } = await supabase.storage
         .from("avatars")
         .remove([
           `${basePath}.jpg`,
@@ -467,20 +475,47 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
           `${basePath}.webp`
         ]);
 
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(storagePath, req.file.buffer, {
-          contentType: req.file.mimetype,
-          upsert: true
-        });
+      if (removeError) {
+        console.warn("[Profile Avatar] Old avatar removal:", removeError.message);
+      }
 
-      if (uploadError) throw uploadError;
+      const { data: uploadedFile, error: uploadError } =
+        await supabase.storage
+          .from("avatars")
+          .upload(storagePath, req.file.buffer, {
+            contentType: req.file.mimetype,
+            cacheControl: "3600",
+            upsert: true
+          });
+
+      if (uploadError) {
+        console.error("[Profile Avatar] Upload failed:", uploadError);
+
+        return res.status(500).json({
+          success: false,
+          error: "AVATAR_UPLOAD_FAILED",
+          message: uploadError.message
+        });
+      }
+
+      console.log("[Profile Avatar] Uploaded:", uploadedFile);
 
       const { data: publicData } = supabase.storage
         .from("avatars")
         .getPublicUrl(storagePath);
 
-      updates.avatar_url = publicData.publicUrl;
+      if (!publicData?.publicUrl) {
+        return res.status(500).json({
+          success: false,
+          error: "AVATAR_URL_FAILED",
+          message: "Gagal mendapatkan URL foto profil."
+        });
+      }
+
+      updates.avatar_url =
+        `${publicData.publicUrl}?v=${Date.now()}`;
+
+      console.log("[Profile Avatar] URL:", updates.avatar_url);
     }
 
     const { data: user, error } = await supabase
@@ -490,7 +525,20 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
       .select("*")
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("[Profile Update] DB update failed:", error);
+
+      return res.status(500).json({
+        success: false,
+        error: "PROFILE_DB_UPDATE_FAILED",
+        message: error.message
+      });
+    }
+
+    console.log("[Profile Update] Success:", {
+      userId: user.id,
+      avatarUrl: user.avatar_url
+    });
 
     res.json({
       success: true,
@@ -507,7 +555,6 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
     });
   }
 });
-
 app.post("/api/me/regenerate-key", auth, async (req, res) => {
   try {
     const newApiKey = apiKey();
