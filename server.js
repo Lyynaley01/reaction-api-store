@@ -616,6 +616,30 @@ async function getApiUser(req) {
   return await getUserByApiKey(key);
 }
 
+
+app.get("/api/dashboard/stats", auth, async (req, res) => {
+  try {
+    const { count, error } = await supabase
+      .from("usage_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", req.user.id)
+      .eq("status", "success");
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      totalReactions: Number(count || 0)
+    });
+  } catch (err) {
+    console.error("[Dashboard Stats]", err);
+    res.status(500).json({
+      success: false,
+      error: "DASHBOARD_STATS_FAILED"
+    });
+  }
+});
+
 app.post("/api/v1/reaction", async (req, res) => {
   const user = await getApiUser(req);
 

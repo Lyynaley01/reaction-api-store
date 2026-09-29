@@ -1,189 +1,182 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Dashboard — Reaction API</title>
-  <link rel="stylesheet" href="/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard — Reaction API</title>
+<link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
 
-<header class="nav">
-  <a class="brand" href="/">REACTION<span>API</span></a>
+<header class="topbar">
+  <a class="brand" href="/">
+    REACTION<span>API</span>
+  </a>
 
   <nav>
     <a href="/docs.html">Docs</a>
-    <button class="btn small" onclick="logout()">Logout</button>
+    <button class="ghost-btn" onclick="logout()">Logout</button>
   </nav>
 </header>
 
-<main class="dashboard">
+<main class="dashboard-page">
 
-  <div class="dash-head">
+  <section class="dashboard-head">
     <div>
       <div class="eyebrow">DASHBOARD</div>
-      <h1 id="hello">Account</h1>
+      <h1>Control center.</h1>
+      <p>Kelola coin, API key, pembelian dan penggunaan API kamu.</p>
     </div>
+  </section>
 
-    <div class="coin">
-      <small>COIN</small>
-      <b id="coins">0</b>
-    </div>
-  </div>
+  <!-- STATS -->
+  <section class="stats-grid">
 
+    <article class="dash-stat coins-stat">
+      <div class="dash-stat-top">
+        <span>COINS</span>
+        <b>◈</b>
+      </div>
 
-  <!-- API ACCESS -->
+      <strong id="coins">0</strong>
+      <small>Saldo coin tersedia</small>
+    </article>
 
-  <section class="panel">
+    <article class="dash-stat reaction-stat">
+      <div class="dash-stat-top">
+        <span>TOTAL REACTIONS</span>
+        <b>↗</b>
+      </div>
 
-    <div class="eyebrow">API ACCESS</div>
-    <h2>API Connection</h2>
-
-    <div class="keyrow">
-      <code id="key">Loading...</code>
-
-      <button class="btn small" onclick="copyKey()">
-        Copy Key
-      </button>
-
-      <button class="btn small ghost" onclick="regen()">
-        Regenerate
-      </button>
-    </div>
-
-    <p class="muted">
-      API key ini digunakan untuk mengakses Reaction API.
-      Jangan bagikan kepada orang lain.
-    </p>
-
-    <div style="margin-top:18px">
-
-      <label>
-        Base URL
-
-        <div class="keyrow" style="margin-top:7px">
-          <code id="baseUrl">https://reaction-api-store.vercel.app</code>
-
-          <button
-            class="btn small ghost"
-            onclick="copyText('https://reaction-api-store.vercel.app','Base URL')">
-            Copy
-          </button>
-        </div>
-      </label>
-
-    </div>
-
-    <div style="margin-top:18px">
-
-      <label>
-        Reaction Endpoint
-
-        <div class="keyrow" style="margin-top:7px">
-          <code id="endpointUrl">https://reaction-api-store.vercel.app/api/v1/reaction</code>
-
-          <button
-            class="btn small ghost"
-            onclick="copyText('https://reaction-api-store.vercel.app/api/v1/reaction','Endpoint')">
-            Copy
-          </button>
-        </div>
-      </label>
-
-    </div>
-
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
-
-      <a class="btn" href="/docs.html">
-        Open API Docs
-      </a>
-
-    </div>
+      <strong id="totalReactions">0</strong>
+      <small>Reaction berhasil diproses</small>
+    </article>
 
   </section>
 
+  <!-- API -->
+  <section class="dash-panel api-panel">
 
-  <!-- BUY COIN -->
-
-  <section class="panel">
-
-    <div class="eyebrow">BALANCE</div>
-    <h2>Beli Coin</h2>
-
-    <div class="buygrid">
-
-      <label>
-        Paket
-
-        <select id="duration">
-          <option value="permanent">Permanen</option>
-          <option value="30_days">30 Hari</option>
-          <option value="7_days">7 Hari</option>
-        </select>
-      </label>
-
-      <label>
-        Coin
-
-        <input
-          id="buyCoins"
-          type="number"
-          min="100"
-          step="100"
-          readonly
-        >
-      </label>
-
+    <div class="panel-heading">
+      <div>
+        <div class="eyebrow">API ACCESS</div>
+        <h2>API credentials</h2>
+      </div>
     </div>
 
-    <p id="packageInfo" class="muted"></p>
+    <div class="credential">
+      <div>
+        <small>API KEY</small>
+        <code id="apiKey">Loading...</code>
+      </div>
+      <button class="copy-btn" onclick="copyText('apiKey')">Copy</button>
+    </div>
 
-    <p>
-      Total:
-      <b id="price">Rp0</b>
-    </p>
+    <div class="credential">
+      <div>
+        <small>BASE URL</small>
+        <code id="baseUrl">https://reaction-api-store.vercel.app</code>
+      </div>
+      <button class="copy-btn" onclick="copyText('baseUrl')">Copy</button>
+    </div>
 
-    <button class="btn" onclick="createOrder()">
-      Buat Order
-    </button>
+    <div class="credential">
+      <div>
+        <small>REACTION ENDPOINT</small>
+        <code id="endpointUrl">https://reaction-api-store.vercel.app/api/v1/reaction</code>
+      </div>
+      <button class="copy-btn" onclick="copyText('endpointUrl')">Copy</button>
+    </div>
 
-    <p id="orderMsg" class="muted"></p>
+    <a class="primary-link" href="/docs.html">
+      Open API Documentation →
+    </a>
 
   </section>
 
+  <!-- ACTIONS -->
+  <section class="dashboard-actions">
+
+    <a class="action-card" href="#packages">
+      <span>◈</span>
+      <div>
+        <b>Buy Coins</b>
+        <small>Tambah saldo coin</small>
+      </div>
+      <strong>→</strong>
+    </a>
+
+    <a class="action-card" href="#orders">
+      <span>⌁</span>
+      <div>
+        <b>Orders</b>
+        <small>Lihat pesanan kamu</small>
+      </div>
+      <strong>→</strong>
+    </a>
+
+  </section>
+
+  <!-- PACKAGES -->
+  <section id="packages" class="dash-panel">
+    <div class="panel-heading">
+      <div>
+        <div class="eyebrow">STORE</div>
+        <h2>Buy Coins</h2>
+      </div>
+    </div>
+
+    <div id="packagesList" class="dashboard-list">
+      Loading packages...
+    </div>
+  </section>
 
   <!-- ORDERS -->
-
-  <section class="panel">
-
-    <div class="eyebrow">TRANSACTIONS</div>
-    <h2>Order</h2>
-
-    <div id="orders">
-      Loading...
+  <section id="orders" class="dash-panel">
+    <div class="panel-heading">
+      <div>
+        <div class="eyebrow">HISTORY</div>
+        <h2>Orders</h2>
+      </div>
     </div>
 
+    <div id="ordersList" class="dashboard-list">
+      Loading orders...
+    </div>
   </section>
 
-
   <!-- USAGE -->
-
-  <section class="panel">
-
-    <div class="eyebrow">ACTIVITY</div>
-    <h2>Riwayat API</h2>
-
-    <div id="usage">
-      Loading...
+  <section class="dash-panel">
+    <div class="panel-heading">
+      <div>
+        <div class="eyebrow">ACTIVITY</div>
+        <h2>Recent Usage</h2>
+      </div>
     </div>
 
+    <div id="usage" class="dashboard-list">
+      Loading usage...
+    </div>
   </section>
 
 </main>
 
+<div id="toastWrap" class="toast-wrap"></div>
+
 <script src="/app.js"></script>
 <script src="/dashboard.js"></script>
+
+<script>
+function copyText(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  navigator.clipboard.writeText(el.textContent.trim())
+    .then(() => toast("Berhasil disalin.", "success", "Copied"))
+    .catch(() => toast("Gagal menyalin.", "error", "Copy"));
+}
+</script>
 
 </body>
 </html>

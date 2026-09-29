@@ -20,6 +20,7 @@ async function load() {
   await loadPackages();
   await loadOrders();
   await loadUsage();
+  await loadDashboardStats();
 }
 
 async function loadPackages() {
@@ -167,6 +168,19 @@ async function proof(id, file) {
   );
 
   await loadOrders();
+}
+
+async function loadDashboardStats() {
+  try {
+    const r = await api("/api/dashboard/stats");
+
+    if (r.success && $("totalReactions")) {
+      $("totalReactions").textContent =
+        Number(r.totalReactions || 0).toLocaleString("id-ID");
+    }
+  } catch (err) {
+    console.error("Dashboard stats:", err);
+  }
 }
 
 async function loadUsage() {
