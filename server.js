@@ -937,6 +937,76 @@ app.get("/api/admin/stats", adminAuth, async (_, res) => {
   }
 });
 
+
+app.get("/api/admin/rankings", adminAuth, async (_, res) => {
+  try {
+    const [
+      { data: users, error: usersError },
+      { data: usage, error: usageError }
+    ] = await Promise.all([
+      supabase
+        .from("users")
+        .select("id, email, name, coins")
+        .order("coins", { ascending: false })
+        .limit(10),
+
+      supabase
+        .from("usage_logs")
+        .select(`
+          user_id,
+          status,
+          user:users (
+            id,
+            email,
+            name
+          )
+        `)
+        .eq("status", "success")
+        .limit(10000)
+    ]);
+
+    if (usersError) throw usersError;
+    if (usageError) throw usageError;
+
+    const requesterMap = new Map();
+
+    for (const row of usage || []) {
+      const user = row.user;
+
+      if (!user) continue;
+
+      const current = requesterMap.get(user.id) || {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        requests: 0
+      };
+
+      current.requests += 1;
+      requesterMap.set(user.id, current);
+    }
+
+    const topRequesters = [...requesterMap.values()]
+      .sort((a, b) => b.requests - a.requests)
+      .slice(0, 10);
+
+    res.json({
+      success: true,
+      rankings: {
+        topRequesters,
+        topCoins: users || []
+      }
+    });
+  } catch (err) {
+    console.error("[Admin Rankings]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ADMIN_RANKINGS_FAILED"
+    });
+  }
+});
+
 app.get("/api/admin/orders", adminAuth, async (_, res) => {
   try {
     const { data: orders, error } = await supabase

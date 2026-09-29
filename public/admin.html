@@ -1,1 +1,110 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin</title><link rel="stylesheet" href="/style.css"></head><body><main class="dashboard"><div class="dash-head"><div><div class="eyebrow">ADMIN</div><h1>Order Manager</h1></div><button class="btn small" onclick="logoutAdmin()">Logout</button></div><div id="loginPanel" class="panel"><form id="adminForm"><input id="email" placeholder="Admin email" type="email"><input id="password" placeholder="Password" type="password"><button class="btn">Login</button></form><p id="loginMsg"></p></div><div id="adminApp" style="display:none"><div class="stats" id="stats"></div><div class="panel"><h2>Pending / Recent Orders</h2><div id="orders"></div></div></div></main><script src="/app.js"></script><script src="/admin.js"></script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin — Reaction API</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+<main class="admin-page">
+
+  <!-- HEADER -->
+  <header class="admin-header">
+    <div>
+      <div class="eyebrow">ADMIN PANEL</div>
+      <h1>Control Center</h1>
+      <p>Kelola pengguna, order, dan aktivitas API.</p>
+    </div>
+
+    <button class="btn small admin-logout-btn" onclick="logoutAdmin()">
+      Logout
+    </button>
+  </header>
+
+  <!-- LOGIN -->
+  <section id="loginPanel" class="admin-login-panel panel">
+    <div class="eyebrow">SECURE ACCESS</div>
+    <h2>Admin Login</h2>
+
+    <form id="adminForm">
+      <input id="email" placeholder="Admin email" type="email" autocomplete="username">
+      <input id="password" placeholder="Password" type="password" autocomplete="current-password">
+      <button class="btn" type="submit">Login</button>
+    </form>
+
+    <p id="loginMsg"></p>
+  </section>
+
+
+  <!-- ADMIN APP -->
+  <section id="adminApp" style="display:none">
+
+    <!-- OVERVIEW -->
+    <section class="admin-stats" id="stats"></section>
+
+
+    <!-- TOP REQUESTER -->
+    <section class="admin-section">
+
+      <div class="admin-section-heading">
+        <div>
+          <div class="eyebrow">API ACTIVITY</div>
+          <h2>Top Requester API</h2>
+          <p>User dengan jumlah request API berhasil terbanyak.</p>
+        </div>
+      </div>
+
+      <div id="topRequesters" class="ranking-board">
+        Loading...
+      </div>
+
+    </section>
+
+
+    <!-- TOP COIN -->
+    <section class="admin-section">
+
+      <div class="admin-section-heading">
+        <div>
+          <div class="eyebrow">COIN BALANCE</div>
+          <h2>Top Coin</h2>
+          <p>User dengan saldo coin terbanyak.</p>
+        </div>
+      </div>
+
+      <div id="topCoins" class="ranking-board">
+        Loading...
+      </div>
+
+    </section>
+
+
+    <!-- ORDERS -->
+    <section class="admin-section">
+
+      <div class="admin-section-heading">
+        <div>
+          <div class="eyebrow">STORE</div>
+          <h2>Orders</h2>
+          <p>Kelola pembelian dan pembayaran pengguna.</p>
+        </div>
+      </div>
+
+      <div id="orders" class="admin-orders">
+        Loading...
+      </div>
+
+    </section>
+
+  </section>
+
+</main>
+
+<script src="/app.js"></script>
+<script src="/admin.js"></script>
+
+</body>
+</html>
