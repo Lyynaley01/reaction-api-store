@@ -103,6 +103,55 @@
 
 </main>
 
+
+<!-- REJECT MODAL -->
+<div id="rejectModal" class="admin-modal" aria-hidden="true">
+  <div class="admin-modal-backdrop" data-close-reject></div>
+
+  <div class="admin-modal-card" role="dialog" aria-modal="true" aria-labelledby="rejectModalTitle">
+    <div class="admin-modal-icon">!</div>
+
+    <div class="admin-modal-content">
+      <div class="eyebrow">ORDER ACTION</div>
+      <h3 id="rejectModalTitle">Tolak Pembelian?</h3>
+      <p>
+        Masukkan alasan penolakan agar pengguna mengetahui
+        alasan order mereka ditolak.
+      </p>
+
+      <label class="admin-modal-label" for="rejectReason">
+        Alasan Penolakan
+      </label>
+
+      <textarea
+        id="rejectReason"
+        class="admin-modal-textarea"
+        rows="4"
+        maxlength="500"
+        placeholder="Contoh: Bukti pembayaran tidak valid."
+      ></textarea>
+
+      <div class="admin-modal-actions">
+        <button
+          type="button"
+          class="btn small secondary-btn"
+          id="cancelReject"
+        >
+          Batal
+        </button>
+
+        <button
+          type="button"
+          class="btn small danger"
+          id="confirmReject"
+        >
+          Tolak Pembelian
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/app.js"></script>
 <script src="/admin.js"></script>
 

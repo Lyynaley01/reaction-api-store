@@ -373,27 +373,110 @@ async function approve(id) {
   loadAdmin();
 }
 
-async function rejectOrder(id) {
-  const reason = prompt(
-    "Alasan penolakan?",
-    "Pembayaran tidak valid."
-  );
+let rejectOrderId = null;
 
-  if (reason === null) return;
+function openRejectModal(id) {
+  const modal = A("rejectModal");
+  const reason = A("rejectReason");
 
-  const r = await adminFetch(
-    "/api/admin/orders/" + encodeURIComponent(id) + "/reject",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ reason })
-    }
-  );
+  if (!modal || !reason) return;
 
-  alert(r.message || r.error || "Selesai.");
-  loadAdmin();
+  rejectOrderId = id;
+
+  reason.value = "Pembayaran tidak valid.";
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+
+  setTimeout(() => {
+    reason.focus();
+    reason.select();
+  }, 50);
 }
+
+function closeRejectModal() {
+  const modal = A("rejectModal");
+
+  if (!modal) return;
+
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  rejectOrderId = null;
+}
+
+async function submitRejectOrder() {
+  if (!rejectOrderId) return;
+
+  const reasonInput = A("rejectReason");
+  const button = A("confirmReject");
+
+  const reason =
+    reasonInput?.value.trim() ||
+    "Pembayaran tidak valid.";
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Menolak...";
+  }
+
+  try {
+    const r = await adminFetch(
+      "/api/admin/orders/" +
+        encodeURIComponent(rejectOrderId) +
+        "/reject",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ reason })
+      }
+    );
+
+    closeRejectModal();
+
+    if (r.success) {
+      loadAdmin();
+    } else {
+      alert(r.message || r.error || "Gagal menolak order.");
+    }
+  } catch (err) {
+    console.error("[Admin Reject]", err);
+
+    closeRejectModal();
+    alert("Gagal terhubung ke server.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Tolak Pembelian";
+    }
+  }
+}
+
+function rejectOrder(id) {
+  openRejectModal(id);
+}
+
+A("cancelReject")?.addEventListener("click", closeRejectModal);
+
+document.querySelector("[data-close-reject]")?.addEventListener(
+  "click",
+  closeRejectModal
+);
+
+A("confirmReject")?.addEventListener(
+  "click",
+  submitRejectOrder
+);
+
+A("rejectReason")?.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    submitRejectOrder();
+  }
+
+  if (e.key === "Escape") {
+    closeRejectModal();
+  }
+});
 
 loadAdmin();
