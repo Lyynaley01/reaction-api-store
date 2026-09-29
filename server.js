@@ -677,7 +677,7 @@ app.get("/api/orders/:id/status", auth, async (req, res) => {
   try {
     const { data: order, error } = await supabase
       .from("orders")
-      .select("id, coins, price, duration, status, payment_proof, created_at, updated_at, approved_at, reason")
+      .select("id, coins, price, duration, status, payment_proof, reason")
       .eq("id", req.params.id)
       .eq("user_id", req.user.id)
       .maybeSingle();
@@ -708,9 +708,6 @@ app.get("/api/orders/:id/status", auth, async (req, res) => {
         duration: order.duration,
         status: order.status,
         hasProof: !!order.payment_proof,
-        createdAt: order.created_at,
-        updatedAt: order.updated_at,
-        approvedAt: order.approved_at,
         reason: order.reason || null
       }
     });
@@ -1326,8 +1323,7 @@ app.post("/api/admin/orders/:id/reject", adminAuth, async (req, res) => {
       .from("orders")
       .update({
         status: "rejected",
-        reason,
-        updated_at: now()
+        reason
       })
       .eq("id", order.id)
       .eq("status", "pending");

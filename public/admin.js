@@ -426,13 +426,21 @@ async function submitApproveOrder() {
     if (r.success) {
       loadAdmin();
     } else {
-      alert(r.message || r.error || "Gagal menyetujui order.");
+      toast(
+        r.message || r.error || "Gagal menyetujui order.",
+        "error",
+        "Gagal Menyetujui Pembayaran"
+      );
     }
   } catch (err) {
     console.error("[Admin Approve]", err);
 
     closeApproveModal();
-    alert("Gagal terhubung ke server.");
+    toast(
+      "Gagal terhubung ke server.",
+      "error",
+      "Koneksi Gagal"
+    );
   } finally {
     if (button) {
       button.disabled = false;
@@ -525,13 +533,21 @@ async function submitRejectOrder() {
     if (r.success) {
       loadAdmin();
     } else {
-      alert(r.message || r.error || "Gagal menolak order.");
+      toast(
+        r.message || r.error || "Gagal menolak order.",
+        "error",
+        "Gagal Menolak Pembayaran"
+      );
     }
   } catch (err) {
     console.error("[Admin Reject]", err);
 
     closeRejectModal();
-    alert("Gagal terhubung ke server.");
+    toast(
+      "Gagal terhubung ke server.",
+      "error",
+      "Koneksi Gagal"
+    );
   } finally {
     if (button) {
       button.disabled = false;
