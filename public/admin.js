@@ -16,6 +16,67 @@ async function adminFetch(url, opts = {}) {
   return r.json();
 }
 
+async function viewPaymentProof(url) {
+  const preview = window.open("", "_blank");
+
+  try {
+    if (!preview) {
+      toast(
+        "Izinkan popup browser untuk membuka bukti pembayaran.",
+        "warning",
+        "Popup Diblokir"
+      );
+      return;
+    }
+
+    preview.document.body.innerHTML = `
+      <div style="
+        min-height:100vh;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:#0b0910;
+        color:#fff;
+        font-family:system-ui,sans-serif;
+      ">
+        Membuka bukti pembayaran...
+      </div>
+    `;
+
+    const response = await fetch(url, {
+      headers: adminHeaders()
+    });
+
+    if (!response.ok) {
+      let message = "Gagal membuka bukti pembayaran.";
+
+      try {
+        const data = await response.json();
+        message = data.message || data.error || message;
+      } catch {}
+
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    preview.location.href = blobUrl;
+
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 60000);
+  } catch (err) {
+    preview.close();
+
+    toast(
+      err.message || "Gagal membuka bukti pembayaran.",
+      "error",
+      "Bukti Gagal Dibuka"
+    );
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -209,14 +270,13 @@ function renderOrders(orders) {
             ${
               x.proofUrl
                 ? `
-                  <a
+                  <button
                     class="btn small secondary-btn"
-                    target="_blank"
-                    rel="noopener"
-                    href="${escapeHtml(x.proofUrl)}"
+                    type="button"
+                    onclick='viewPaymentProof(${JSON.stringify(x.proofUrl)})'
                   >
                     Lihat Bukti
-                  </a>
+                  </button>
                 `
                 : ""
             }
@@ -583,3 +643,5 @@ A("rejectReason")?.addEventListener("keydown", (e) => {
 });
 
 loadAdmin();
+
+window.viewPaymentProof = viewPaymentProof;
