@@ -238,19 +238,340 @@ async function createOrder(duration) {
     return;
   }
 
-  toast(
-    `Order ${r.order.id} berhasil dibuat.`,
-    "success",
-    "Order Dibuat"
-  );
-
   await loadOrders();
+
+  openPaymentModal(r.order);
+}
+
+
+/* =========================
+   PAYMENT MODAL
+========================= */
+
+let paymentModalOrderId = null;
+
+function closePaymentModal() {
+  const modal = document.getElementById("paymentModal");
+
+  if (modal) {
+    modal.remove();
+  }
+
+  paymentModalOrderId = null;
+}
+
+function openPaymentModal(order) {
+  closePaymentModal();
+
+  paymentModalOrderId = order.id;
+
+  const modal = document.createElement("div");
+
+  modal.id = "paymentModal";
+  modal.className = "admin-modal";
+
+  modal.innerHTML = `
+    <div class="admin-modal-backdrop"></div>
+
+    <div class="admin-modal-card payment-modal-card">
+
+      <button
+        type="button"
+        class="admin-modal-close"
+        id="paymentModalClose"
+        aria-label="Tutup"
+      >
+        ×
+      </button>
+
+      <div class="eyebrow">PAYMENT</div>
+
+      <h2>Pembayaran Order</h2>
+
+      <p class="payment-order-id">
+        Order <strong>${escapeHtml(order.id)}</strong>
+      </p>
+
+      <div class="payment-summary">
+        <div>
+          <span>Coin</span>
+          <strong>
+            ${Number(order.coins || 0).toLocaleString("id-ID")}
+          </strong>
+        </div>
+
+        <div>
+          <span>Masa Aktif</span>
+          <strong>${escapeHtml(order.duration || "—")}</strong>
+        </div>
+
+        <div>
+          <span>Total</span>
+          <strong>
+            Rp${Number(order.price || 0).toLocaleString("id-ID")}
+          </strong>
+        </div>
+      </div>
+
+      <div class="payment-qr-wrap">
+        <img
+          src="https://files.catbox.moe/r5y2he.jpeg"
+          alt="QR pembayaran"
+          class="payment-qr"
+        >
+      </div>
+
+      <div class="payment-instruction">
+        <strong>Transfer sesuai nominal di atas.</strong>
+        <span>
+          Setelah transfer, upload bukti pembayaran yang jelas.
+        </span>
+      </div>
+
+      <label class="payment-proof-btn">
+        <span id="paymentProofLabel">
+          Upload Bukti Transfer
+        </span>
+
+        <input
+          id="paymentProofInput"
+          type="file"
+          accept="image/*,.pdf"
+        >
+      </label>
+
+      <div
+        id="paymentProofStatus"
+        class="payment-proof-status"
+      >
+        Bukti transfer wajib diupload.
+      </div>
+
+      <button
+        id="paymentCheckBtn"
+        class="primary-btn payment-check-btn"
+        type="button"
+        disabled
+      >
+        Sudah bayar? Cek status
+      </button>
+
+      <button
+        id="paymentCancelBtn"
+        class="btn small payment-cancel-btn"
+        type="button"
+      >
+        Tutup
+      </button>
+
+      <div
+        id="paymentStatusResult"
+        class="payment-status-result"
+      ></div>
+
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const close = () => closePaymentModal();
+
+  modal
+    .querySelector("#paymentModalClose")
+    .addEventListener("click", close);
+
+  modal
+    .querySelector("#paymentCancelBtn")
+    .addEventListener("click", close);
+
+  modal
+    .querySelector(".admin-modal-backdrop")
+    .addEventListener("click", close);
+
+  const input = modal.querySelector("#paymentProofInput");
+  const label = modal.querySelector("#paymentProofLabel");
+  const proofStatus = modal.querySelector("#paymentProofStatus");
+  const checkBtn = modal.querySelector("#paymentCheckBtn");
+  const result = modal.querySelector("#paymentStatusResult");
+
+  let proofUploaded = false;
+
+  input.addEventListener("change", async () => {
+    const file = input.files && input.files[0];
+
+    if (!file) {
+      proofUploaded = false;
+      checkBtn.disabled = true;
+      label.textContent = "Upload Bukti Transfer";
+      proofStatus.textContent =
+        "Bukti transfer wajib diupload.";
+      return;
+    }
+
+    label.textContent = "Mengupload bukti...";
+
+    const formData = new FormData();
+    formData.append("proof", file);
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `/api/orders/${encodeURIComponent(order.id)}/proof`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message ||
+          data.error ||
+          "Gagal mengupload bukti."
+        );
+      }
+
+      proofUploaded = true;
+      checkBtn.disabled = false;
+
+      label.textContent = "Bukti berhasil diupload ✓";
+
+      proofStatus.textContent =
+        "Bukti pembayaran sudah diterima. Kamu bisa cek status pembayaran.";
+
+      toast(
+        "Bukti pembayaran berhasil dikirim.",
+        "success",
+        "Bukti Terkirim"
+      );
+
+      await loadOrders();
+
+    } catch (err) {
+      proofUploaded = false;
+      checkBtn.disabled = true;
+
+      label.textContent = "Upload Bukti Transfer";
+
+      proofStatus.textContent =
+        err.message || "Gagal mengupload bukti.";
+
+      input.value = "";
+
+      toast(
+        err.message || "Gagal mengupload bukti.",
+        "error",
+        "Upload Gagal"
+      );
+    }
+  });
+
+  checkBtn.addEventListener("click", async () => {
+    if (!proofUploaded) {
+      toast(
+        "Upload bukti transfer terlebih dahulu.",
+        "error",
+        "Bukti Diperlukan"
+      );
+      return;
+    }
+
+    checkBtn.disabled = true;
+    checkBtn.textContent = "Mengecek status...";
+
+    try {
+      const r = await api(
+        `/api/orders/${encodeURIComponent(order.id)}/status`
+      );
+
+      if (!r.success) {
+        throw new Error(
+          r.message ||
+          r.error ||
+          "Gagal mengecek status."
+        );
+      }
+
+      const current = r.order;
+
+      if (current.status === "pending") {
+        result.innerHTML = `
+          <div class="payment-status pending">
+            <strong>⏳ Menunggu verifikasi admin</strong>
+            <span>
+              Bukti pembayaran sudah diterima. Silakan tunggu admin memproses order ini.
+            </span>
+          </div>
+        `;
+      }
+
+      else if (current.status === "approved") {
+        result.innerHTML = `
+          <div class="payment-status approved">
+            <strong>✓ Pembayaran disetujui</strong>
+            <span>
+              ${Number(current.coins || 0).toLocaleString("id-ID")}
+              coin sudah masuk ke akun kamu.
+            </span>
+          </div>
+        `;
+
+        await loadOrders();
+      }
+
+      else if (current.status === "rejected") {
+        result.innerHTML = `
+          <div class="payment-status rejected">
+            <strong>✕ Pembayaran ditolak</strong>
+            <span>
+              ${escapeHtml(
+                current.reason ||
+                "Pembayaran tidak valid."
+              )}
+            </span>
+          </div>
+        `;
+
+        await loadOrders();
+      }
+
+    } catch (err) {
+      result.innerHTML = `
+        <div class="payment-status rejected">
+          <strong>Gagal mengecek status</strong>
+          <span>
+            ${escapeHtml(
+              err.message ||
+              "Terjadi kesalahan."
+            )}
+          </span>
+        </div>
+      `;
+    } finally {
+      checkBtn.disabled = false;
+      checkBtn.textContent = "Sudah bayar? Cek status";
+    }
+  });
 }
 
 
 /* =========================
    ORDERS
 ========================= */
+
+window.openPaymentModal = openPaymentModal;
+window.closePaymentModal = closePaymentModal;
+
+function openExistingPaymentModal(order) {
+  openPaymentModal(order);
+}
+
 
 async function loadOrders() {
   const container = $("ordersList");
@@ -312,14 +633,13 @@ async function loadOrders() {
           ${
             o.status === "pending"
               ? `
-                <label class="upload-btn">
-                  Upload Bukti
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onchange="proof('${escapeHtml(o.id)}', this.files[0])"
-                  >
-                </label>
+                <button
+                  class="primary-btn order-payment-btn"
+                  type="button"
+                  onclick='openExistingPaymentModal(${JSON.stringify(o)})'
+                >
+                  Bayar / Cek Status
+                </button>
               `
               : ""
           }
@@ -432,63 +752,6 @@ $("confirmDeleteOrders")?.addEventListener(
   "click",
   deleteAllOrders
 );
-
-/* =========================
-   PAYMENT PROOF
-========================= */
-
-async function proof(id, file) {
-  if (!file) return;
-
-  const fd = new FormData();
-  fd.append("proof", file);
-
-  try {
-    const r = await fetch(
-      "/api/orders/" +
-      encodeURIComponent(id) +
-      "/proof",
-      {
-        method: "POST",
-        headers: {
-          Authorization:
-            "Bearer " + localStorage.token
-        },
-        body: fd
-      }
-    );
-
-    const j = await r.json().catch(() => ({
-      success: false,
-      error: "INVALID_SERVER_RESPONSE"
-    }));
-
-    if (!j.success) {
-      toast(
-        j.error || "Upload bukti gagal.",
-        "error"
-      );
-      return;
-    }
-
-    toast(
-      "Bukti pembayaran berhasil dikirim.",
-      "success",
-      "Bukti Terkirim"
-    );
-
-    await loadOrders();
-
-  } catch (err) {
-    console.error("[Proof]", err);
-
-    toast(
-      "Tidak dapat menghubungi server.",
-      "error"
-    );
-  }
-}
-
 
 /* =========================
    USAGE

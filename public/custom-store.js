@@ -201,14 +201,18 @@
           );
         }
 
-        toastMsg(
-          `Order ${coins.toLocaleString("id-ID")} coin · ${days} hari berhasil dibuat.`,
-          "success",
-          "Order Created"
-        );
-
         if (typeof window.loadOrders === "function") {
           await window.loadOrders();
+        }
+
+        if (typeof window.openPaymentModal === "function") {
+          window.openPaymentModal(data.order);
+        } else {
+          toastMsg(
+            "Order berhasil dibuat, tetapi payment modal tidak tersedia.",
+            "error",
+            "Payment"
+          );
         }
 
         const orders = document.getElementById("orders");
@@ -221,6 +225,7 @@
             });
           }, 150);
         }
+
       } catch (err) {
         toastMsg(
           err.message || "Gagal membuat pesanan.",

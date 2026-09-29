@@ -673,6 +673,57 @@ app.post("/api/orders/:id/proof", auth, upload.single("proof"), async (req, res)
   }
 });
 
+app.get("/api/orders/:id/status", auth, async (req, res) => {
+  try {
+    const { data: order, error } = await supabase
+      .from("orders")
+      .select("id, coins, price, duration, status, payment_proof, created_at, updated_at, approved_at, reason")
+      .eq("id", req.params.id)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "ORDER_NOT_FOUND"
+      });
+    }
+
+    if (order.status === "pending" && !order.payment_proof) {
+      return res.status(400).json({
+        success: false,
+        error: "PROOF_REQUIRED",
+        message: "Upload bukti transfer terlebih dahulu."
+      });
+    }
+
+    return res.json({
+      success: true,
+      order: {
+        id: order.id,
+        coins: order.coins,
+        price: order.price,
+        duration: order.duration,
+        status: order.status,
+        hasProof: !!order.payment_proof,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        approvedAt: order.approved_at,
+        reason: order.reason || null
+      }
+    });
+  } catch (err) {
+    console.error("[Order Status]", err);
+
+    return res.status(500).json({
+      success: false,
+      error: "ORDER_STATUS_FAILED"
+    });
+  }
+});
+
 app.get("/api/usage", auth, async (req, res) => {
   try {
     const { data: usage, error } = await supabase
@@ -1170,6 +1221,14 @@ app.post("/api/admin/orders/:id/approve", adminAuth, async (req, res) => {
       return res.status(400).json({
         success: false,
         error: "ORDER_NOT_PENDING"
+      });
+    }
+
+    if (!order.payment_proof) {
+      return res.status(400).json({
+        success: false,
+        error: "PAYMENT_PROOF_REQUIRED",
+        message: "Order belum memiliki bukti pembayaran."
       });
     }
 
