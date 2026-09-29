@@ -1225,24 +1225,3 @@ document.addEventListener("DOMContentLoaded", () => {
     previewProfilePhoto
   );
 });
-document.addEventListener("DOMContentLoaded", () => {
-  $("editProfileBtn")?.addEventListener(
-    "click",
-    openProfileEditor
-  );
-
-  $("cancelProfileBtn")?.addEventListener(
-    "click",
-    closeProfileEditor
-  );
-
-  $("saveProfileBtn")?.addEventListener(
-    "click",
-    saveProfile
-  );
-
-  $("profilePhoto")?.addEventListener(
-    "change",
-    previewProfilePhoto
-  );
-});
