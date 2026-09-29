@@ -936,6 +936,178 @@ $("confirmDeleteHistory")?.addEventListener(
    API KEY
 ========================= */
 
+
+function renderProfile(user) {
+  const name = user.name || "User";
+  const email = user.email || "-";
+
+  const nameEl = $("profileName");
+  const emailEl = $("profileEmail");
+  const initialEl = $("profileAvatarInitial");
+  const imageEl = $("profileAvatarImage");
+  const inputEl = $("profileNameInput");
+
+  if (nameEl) nameEl.textContent = name;
+  if (emailEl) emailEl.textContent = email;
+  if (initialEl) initialEl.textContent = name.charAt(0).toUpperCase();
+  if (inputEl) inputEl.value = user.name || "";
+
+  if (imageEl) {
+    if (user.avatarUrl) {
+      imageEl.src =
+        `${user.avatarUrl}${user.avatarUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+      imageEl.style.display = "block";
+
+      if (initialEl) {
+        initialEl.style.display = "none";
+      }
+    } else {
+      imageEl.removeAttribute("src");
+      imageEl.style.display = "none";
+
+      if (initialEl) {
+        initialEl.style.display = "flex";
+      }
+    }
+  }
+}
+
+function openProfileEditor() {
+  const editor = $("profileEditor");
+  const input = $("profileNameInput");
+
+  if (!editor) return;
+
+  editor.hidden = false;
+
+  if (input) {
+    input.value = me?.name || "";
+    input.focus();
+  }
+}
+
+function closeProfileEditor() {
+  const editor = $("profileEditor");
+
+  if (editor) {
+    editor.hidden = true;
+  }
+
+  const input = $("profileNameInput");
+
+  if (input) {
+    input.value = me?.name || "";
+  }
+}
+
+function previewProfilePhoto(event) {
+  const file = event.target.files?.[0];
+
+  if (!file) return;
+
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    toast("Foto harus JPG, PNG, atau WEBP.", "error");
+    event.target.value = "";
+    return;
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    toast("Ukuran foto maksimal 2 MB.", "error");
+    event.target.value = "";
+    return;
+  }
+
+  const image = $("profileAvatarImage");
+  const initial = $("profileAvatarInitial");
+
+  if (!image) return;
+
+  image.src = URL.createObjectURL(file);
+  image.style.display = "block";
+
+  if (initial) {
+    initial.style.display = "none";
+  }
+}
+
+async function saveProfile() {
+  const input = $("profileNameInput");
+  const photo = $("profilePhoto");
+  const saveBtn = $("saveProfileBtn");
+
+  const name = String(input?.value || "").trim();
+  const file = photo?.files?.[0];
+
+  if (!name && !file) {
+    toast("Tidak ada perubahan profil.", "error");
+    return;
+  }
+
+  if (name.length > 100) {
+    toast("Nama maksimal 100 karakter.", "error");
+    return;
+  }
+
+  const form = new FormData();
+
+  if (name) {
+    form.append("name", name);
+  }
+
+  if (file) {
+    form.append("avatar", file);
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Menyimpan...";
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await fetch("/api/me/profile", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: form
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      toast(
+        result.message || result.error || "Gagal memperbarui profil.",
+        "error"
+      );
+      return;
+    }
+
+    me = result.user;
+    renderProfile(me);
+    closeProfileEditor();
+
+    if (photo) {
+      photo.value = "";
+    }
+
+    toast(
+      "Profil berhasil diperbarui.",
+      "success",
+      "Profile Updated"
+    );
+  } catch (err) {
+    console.error("[Profile]", err);
+    toast("Gagal terhubung ke server.", "error");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Simpan Perubahan";
+    }
+  }
+}
+
 function copyKey() {
   if (!me?.apiKey) {
     toast(
@@ -1027,3 +1199,49 @@ function escapeHtml(value) {
 ========================= */
 
 load();
+
+
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  $("editProfileBtn")?.addEventListener(
+    "click",
+    openProfileEditor
+  );
+
+  $("cancelProfileBtn")?.addEventListener(
+    "click",
+    closeProfileEditor
+  );
+
+  $("saveProfileBtn")?.addEventListener(
+    "click",
+    saveProfile
+  );
+
+  $("profilePhoto")?.addEventListener(
+    "change",
+    previewProfilePhoto
+  );
+});
+document.addEventListener("DOMContentLoaded", () => {
+  $("editProfileBtn")?.addEventListener(
+    "click",
+    openProfileEditor
+  );
+
+  $("cancelProfileBtn")?.addEventListener(
+    "click",
+    closeProfileEditor
+  );
+
+  $("saveProfileBtn")?.addEventListener(
+    "click",
+    saveProfile
+  );
+
+  $("profilePhoto")?.addEventListener(
+    "change",
+    previewProfilePhoto
+  );
+});

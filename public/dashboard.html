@@ -30,7 +30,75 @@
     </div>
   </section>
 
-  <!-- STATS -->
+  <!-- PROFILE -->
+<section class="dash-panel profile-panel">
+  <div class="panel-heading">
+    <div>
+      <div class="eyebrow">ACCOUNT</div>
+      <h2>My Profile</h2>
+    </div>
+  </div>
+
+  <div class="profile-card">
+    <div class="profile-avatar-wrap">
+      <div class="profile-avatar" id="profileAvatar">
+        <span id="profileAvatarInitial">?</span>
+        <img id="profileAvatarImage" alt="Profile photo">
+      </div>
+
+      <label class="profile-photo-btn" for="profilePhoto">
+        Change Photo
+      </label>
+
+      <input
+        id="profilePhoto"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+      >
+    </div>
+
+    <div class="profile-info">
+      <div class="profile-view">
+        <strong id="profileName">Loading...</strong>
+        <span id="profileEmail">Loading...</span>
+      </div>
+
+      <button class="copy-btn" id="editProfileBtn" type="button">
+        Edit Profile
+      </button>
+    </div>
+  </div>
+
+  <div class="profile-editor" id="profileEditor" hidden>
+    <label>
+      <span>Nama</span>
+      <input
+        id="profileNameInput"
+        type="text"
+        maxlength="100"
+        autocomplete="name"
+        placeholder="Nama kamu"
+      >
+    </label>
+
+    <div class="profile-preview-note">
+      JPG, PNG, atau WEBP · maksimal 2 MB
+    </div>
+
+    <div class="profile-editor-actions">
+      <button class="copy-btn" id="cancelProfileBtn" type="button">
+        Batal
+      </button>
+
+      <button class="copy-btn" id="saveProfileBtn" type="button">
+        Simpan Perubahan
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
   <section class="stats-grid">
 
     <article class="dash-stat coins-stat">
@@ -73,7 +141,10 @@
         <small>API KEY</small>
         <code id="apiKey">Loading...</code>
       </div>
-      <button class="copy-btn" onclick="copyText('apiKey')">Copy</button>
+      <div class="credential-actions">
+        <button class="copy-btn" onclick="copyText('apiKey')">Copy</button>
+        <button class="copy-btn" onclick="regen()">Regenerate</button>
+      </div>
     </div>
 
     <div class="credential">

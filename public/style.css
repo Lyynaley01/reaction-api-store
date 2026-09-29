@@ -2666,3 +2666,143 @@ footer {
   }
 }
 
+
+
+/* PROFILE */
+.profile-panel {
+  margin-bottom: 18px;
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.profile-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.profile-avatar {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface, #151515);
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.profile-photo-btn {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: .8;
+}
+
+.profile-photo-btn:hover {
+  opacity: 1;
+}
+
+.profile-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.profile-view {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.profile-view strong {
+  font-size: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-view span {
+  opacity: .65;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-editor {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border, rgba(255,255,255,.1));
+}
+
+.profile-editor[hidden] {
+  display: none;
+}
+
+.profile-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-editor label span {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: .7;
+}
+
+.profile-editor input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-preview-note {
+  margin-top: 9px;
+  font-size: 12px;
+  opacity: .55;
+}
+
+.profile-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+@media (max-width: 700px) {
+  .profile-card {
+    align-items: flex-start;
+  }
+
+  .profile-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-editor-actions {
+    flex-direction: column;
+  }
+
+  .profile-editor-actions .copy-btn {
+    width: 100%;
+  }
+}

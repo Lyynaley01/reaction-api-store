@@ -113,6 +113,7 @@ function publicUser(u) {
     coins: u.coins || 0,
     coinExpiry: u.coin_expiry || null,
     apiKey: u.api_key,
+    avatarUrl: u.avatar_url || null,
     createdAt: u.created_at
   };
 }
@@ -245,6 +246,19 @@ function packagePrice(coins) {
 function packageByDuration(duration) {
   return PACKAGE_CONFIG[duration] || null;
 }
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_, file, cb) => {
+    const ok = /^(image\/(jpeg|png|webp))$/i.test(file.mimetype);
+
+    cb(
+      ok ? null : new Error("Foto profil harus JPG, PNG, atau WEBP."),
+      ok
+    );
+  }
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -401,6 +415,96 @@ app.post("/api/auth/logout", (_, res) => res.json({ success: true }));
 
 app.get("/api/me", auth, (req, res) => {
   res.json({ success: true, user: publicUser(req.user) });
+});
+
+app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res) => {
+  try {
+    const name = String(req.body.name || "").trim();
+
+    if (name.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: "NAME_TOO_LONG",
+        message: "Nama maksimal 100 karakter."
+      });
+    }
+
+    if (!name && !req.file) {
+      return res.status(400).json({
+        success: false,
+        error: "PROFILE_EMPTY",
+        message: "Tidak ada perubahan profil."
+      });
+    }
+
+    const updates = {
+      updated_at: now()
+    };
+
+    if (name) {
+      updates.name = name;
+    }
+
+    if (req.file) {
+      let ext = ".jpg";
+
+      if (req.file.mimetype === "image/png") {
+        ext = ".png";
+      } else if (req.file.mimetype === "image/webp") {
+        ext = ".webp";
+      }
+
+      const basePath = `${req.user.id}/avatar`;
+      const storagePath = `${basePath}${ext}`;
+
+      // Hapus avatar lama dari kemungkinan ekstensi sebelumnya.
+      await supabase.storage
+        .from("avatars")
+        .remove([
+          `${basePath}.jpg`,
+          `${basePath}.png`,
+          `${basePath}.webp`
+        ]);
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(storagePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(storagePath);
+
+      updates.avatar_url = publicData.publicUrl;
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", req.user.id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: "Profil berhasil diperbarui.",
+      user: publicUser(user)
+    });
+  } catch (err) {
+    console.error("[Profile Update]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "PROFILE_UPDATE_FAILED",
+      message: err.message || "Gagal memperbarui profil."
+    });
+  }
 });
 
 app.post("/api/me/regenerate-key", auth, async (req, res) => {
