@@ -437,26 +437,10 @@ app.post("/api/orders", auth, async (req, res) => {
       return res.status(400).json({ success: false, error: "INVALID_DURATION" });
     }
 
-    // Untuk paket permanen/30 hari/7 hari, coin & harga mengikuti konfigurasi paket.
-    // Custom tetap boleh mengirim jumlah coin sendiri melalui requestedCoins.
-    const requestedCoins = req.body.coins == null || req.body.coins === "" ? null : Number(req.body.coins);
-    const coins = requestedCoins == null ? selectedPackage.coins : requestedCoins;
-
-    if (!Number.isInteger(coins) || coins < 100) {
-      return res.status(400).json({
-        success: false,
-        error: "COINS_MIN_100_INTEGER"
-      });
-    }
-
-    // 999.999 coin permanen memang bukan kelipatan 100, jadi paket permanen
-    // dikecualikan dari aturan kelipatan 100. Paket durasi tetap mengikuti konfigurasi.
-    if (duration !== "permanent" && coins % 100 !== 0) {
-      return res.status(400).json({
-        success: false,
-        error: "COINS_MUST_BE_MULTIPLE_OF_100"
-      });
-    }
+    // Coin dan harga selalu mengikuti konfigurasi paket.
+    // Nilai coins dari frontend tidak boleh mengubah harga paket.
+    const coins = selectedPackage.coins;
+    const price = selectedPackage.price;
 
     const createdAt = now();
 
@@ -465,7 +449,7 @@ app.post("/api/orders", auth, async (req, res) => {
       .insert({
         user_id: req.user.id,
         coins,
-        price: requestedCoins == null ? selectedPackage.price : packagePrice(coins),
+        price,
         duration,
         status: "pending",
         payment_proof: null,
