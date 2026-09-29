@@ -1056,7 +1056,14 @@ async function saveProfile() {
   }
 
   if (file) {
-    form.append("avatar", file);
+    form.append("avatar", file, file.name);
+    console.log("[Profile Upload] Sending avatar:", {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+  } else {
+    console.warn("[Profile Upload] NO AVATAR FILE SELECTED");
   }
 
   if (saveBtn) {
