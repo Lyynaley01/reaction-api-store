@@ -1,11 +1,260 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API Docs</title><link rel="stylesheet" href="/style.css"></head><body><header class="nav"><a class="brand" href="/">REACTION<span>API</span></a><nav><a href="/">Home</a><a href="/dashboard.html">Dashboard</a></nav></header><main class="docs"><div class="eyebrow">DOCUMENTATION</div><h1>Reaction API</h1><p>Gunakan API key akun pada header <code>X-API-Key</code> atau <code>Authorization: Bearer</code>.</p><div class="panel"><h2>POST /api/v1/reaction</h2><pre>curl -X POST https://DOMAIN-ANDA/api/v1/reaction \\
--H "X-API-Key: rak_xxxxxxxxx" \\
--H "Content-Type: application/json" \\
--d '{"url":"https://whatsapp.com/channel/...","reaction":"❤️"}'</pre><h3>Response sukses</h3><pre>{
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>API Docs — Reaction API</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+<header class="nav">
+  <a class="brand" href="/">REACTION<span>API</span></a>
+
+  <nav>
+    <a href="/">Home</a>
+    <a href="/dashboard.html">Dashboard</a>
+  </nav>
+</header>
+
+<main class="docs">
+
+  <div class="eyebrow">DOCUMENTATION</div>
+
+  <h1>Reaction API</h1>
+
+  <p class="muted">
+    API untuk mengirim reaction menggunakan API key akun Anda.
+  </p>
+
+
+  <!-- BASE URL -->
+
+  <section class="panel">
+
+    <div class="eyebrow">BASE URL</div>
+
+    <h2>Production</h2>
+
+    <div class="keyrow">
+      <code>https://reaction-api-store.vercel.app</code>
+
+      <button
+        class="btn small"
+        onclick="copyText('https://reaction-api-store.vercel.app','Base URL')">
+        Copy
+      </button>
+    </div>
+
+  </section>
+
+
+  <!-- AUTH -->
+
+  <section class="panel">
+
+    <div class="eyebrow">AUTHENTICATION</div>
+
+    <h2>API Key</h2>
+
+    <p class="muted">
+      Gunakan API key akun Anda melalui header
+      <code>X-API-Key</code>.
+    </p>
+
+    <pre>RELS-REACTION-XXXX</pre>
+
+    <p class="muted">
+      Contoh di atas hanya placeholder. Gunakan API key milik Anda
+      dari halaman Dashboard.
+    </p>
+
+  </section>
+
+
+  <!-- ENDPOINT -->
+
+  <section class="panel">
+
+    <div class="eyebrow">ENDPOINT</div>
+
+    <h2>POST /api/v1/reaction</h2>
+
+    <div class="keyrow">
+      <code>https://reaction-api-store.vercel.app/api/v1/reaction</code>
+
+      <button
+        class="btn small"
+        onclick="copyText('https://reaction-api-store.vercel.app/api/v1/reaction','Endpoint')">
+        Copy
+      </button>
+    </div>
+
+  </section>
+
+
+  <!-- REQUEST -->
+
+  <section class="panel">
+
+    <div class="eyebrow">REQUEST</div>
+
+    <h2>cURL</h2>
+
+<pre>curl -X POST https://reaction-api-store.vercel.app/api/v1/reaction \
+-H "X-API-Key: RELS-REACTION-XXXX" \
+-H "Content-Type: application/json" \
+-d '{"url":"https://whatsapp.com/channel/...","reaction":"❤️"}'</pre>
+
+  </section>
+
+
+  <!-- JAVASCRIPT -->
+
+  <section class="panel">
+
+    <div class="eyebrow">EXAMPLE</div>
+
+    <h2>JavaScript</h2>
+
+<pre>const response = await fetch(
+  "https://reaction-api-store.vercel.app/api/v1/reaction",
+  {
+    method: "POST",
+    headers: {
+      "X-API-Key": "RELS-REACTION-XXXX",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      url: "https://whatsapp.com/channel/...",
+      reaction: "❤️"
+    })
+  }
+);
+
+const data = await response.json();
+
+console.log(data);</pre>
+
+  </section>
+
+
+  <!-- PYTHON -->
+
+  <section class="panel">
+
+    <div class="eyebrow">EXAMPLE</div>
+
+    <h2>Python</h2>
+
+<pre>import requests
+
+url = "https://reaction-api-store.vercel.app/api/v1/reaction"
+
+headers = {
+    "X-API-Key": "RELS-REACTION-XXXX",
+    "Content-Type": "application/json"
+}
+
+data = {
+    "url": "https://whatsapp.com/channel/...",
+    "reaction": "❤️"
+}
+
+response = requests.post(
+    url,
+    headers=headers,
+    json=data
+)
+
+print(response.json())</pre>
+
+  </section>
+
+
+  <!-- PARAMETERS -->
+
+  <section class="panel">
+
+    <div class="eyebrow">PARAMETERS</div>
+
+    <h2>Request Body</h2>
+
+    <div class="row">
+      <div>
+        <b>url</b>
+        <br>
+        <small class="muted">
+          URL target yang ingin diberi reaction.
+        </small>
+      </div>
+
+      <span>string</span>
+    </div>
+
+    <div class="row">
+      <div>
+        <b>reaction</b>
+        <br>
+        <small class="muted">
+          Emoji reaction yang ingin dikirim.
+        </small>
+      </div>
+
+      <span>string</span>
+    </div>
+
+  </section>
+
+
+  <!-- COIN -->
+
+  <section class="panel">
+
+    <div class="eyebrow">COIN SYSTEM</div>
+
+    <h2>Penggunaan Coin</h2>
+
+    <p class="muted">
+      Setiap request reaction yang berhasil menggunakan
+      <b>1 coin</b>.
+    </p>
+
+    <p class="muted">
+      Jika request ke upstream gagal, coin akan dikembalikan
+      secara otomatis.
+    </p>
+
+  </section>
+
+
+  <!-- RESPONSE -->
+
+  <section class="panel">
+
+    <div class="eyebrow">RESPONSE</div>
+
+    <h2>Success</h2>
+
+<pre>{
   "success": true,
-  "message": "Reaction berhasil diproses.",
-  "coin_used": 1,
-  "coin_remaining": 99,
-  "task": {},
-  "vip": {}
-}</pre></div><div class="panel"><h2>Rules</h2><ul><li>1 successful request = 1 coin.</li><li>Failed upstream request tidak memotong coin.</li><li>Minimal custom top-up 100 coin.</li><li>Custom coin harus kelipatan 100.</li></ul></div></main></body></html>
+  "task": "...",
+  "vip": true
+}</pre>
+
+    <h2 style="margin-top:22px">Error</h2>
+
+<pre>{
+  "success": false,
+  "error": "..."
+}</pre>
+
+  </section>
+
+</main>
+
+<script src="/app.js"></script>
+
+</body>
+</html>

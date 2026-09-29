@@ -58,7 +58,14 @@ function id(prefix = "") {
 }
 
 function apiKey() {
-  return "rak_" + crypto.randomBytes(24).toString("hex");
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let random = "";
+
+  for (let i = 0; i < 4; i++) {
+    random += chars[crypto.randomInt(chars.length)];
+  }
+
+  return "RELS-REACTION-" + random;
 }
 
 function now() {
