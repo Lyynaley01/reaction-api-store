@@ -785,28 +785,10 @@ app.post("/api/v1/reaction", async (req, res) => {
   }
 });
 
-// TEMP DEBUG — hapus setelah pengecekan
-app.get("/api/debug-admin-env", (req, res) => {
-  res.json({
-    adminEmailExists: Boolean(process.env.ADMIN_EMAIL),
-    adminEmailLength: String(process.env.ADMIN_EMAIL || "").length,
-    adminPasswordExists: Boolean(process.env.ADMIN_PASSWORD),
-    adminPasswordLength: String(process.env.ADMIN_PASSWORD || "").length,
-    jwtSecretExists: Boolean(process.env.JWT_SECRET)
-  });
-});
-
 // Admin
 app.post("/api/admin/login", (req, res) => {
   const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || "");
-
-  console.log("[Admin Login Debug]", {
-    inputEmailLength: email.length,
-    inputPasswordLength: password.length,
-    envEmailLength: String(process.env.ADMIN_EMAIL || "").trim().toLowerCase().length,
-    envPasswordLength: String(process.env.ADMIN_PASSWORD || "").length
-  });
 
   if (
     email !== normalizeEmail(process.env.ADMIN_EMAIL || "") ||
