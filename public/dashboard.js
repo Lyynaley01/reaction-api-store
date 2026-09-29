@@ -373,6 +373,9 @@ function openPaymentModal(order) {
   `;
 
   document.body.appendChild(modal);
+  requestAnimationFrame(() => {
+    modal.classList.add("open");
+  });
 
   const close = () => closePaymentModal();
 
