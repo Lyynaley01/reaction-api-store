@@ -444,18 +444,10 @@ app.put("/api/debug/profile-upload", avatarUpload.single("avatar"), async (req, 
   });
 });
 
-app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res) => {
+app.put("/api/me/profile", auth, async (req, res) => {
   try {
     const name = String(req.body.name || "").trim();
-
-    console.log("[Profile Update]", {
-      userId: req.user.id,
-      name,
-      hasFile: !!req.file,
-      fileName: req.file?.originalname || null,
-      fileType: req.file?.mimetype || null,
-      fileSize: req.file?.size || null
-    });
+    const avatar = req.body.avatar;
 
     if (name.length > 100) {
       return res.status(400).json({
@@ -465,7 +457,7 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
       });
     }
 
-    if (!name && !req.file) {
+    if (!name && !avatar) {
       return res.status(400).json({
         success: false,
         error: "PROFILE_EMPTY",
@@ -481,12 +473,44 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
       updates.name = name;
     }
 
-    if (req.file) {
+    if (avatar) {
+      if (typeof avatar !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "INVALID_AVATAR"
+        });
+      }
+
+      const match = avatar.match(
+        /^data:(image\/jpeg|image\/png|image\/webp);base64,(.+)$/
+      );
+
+      if (!match) {
+        return res.status(400).json({
+          success: false,
+          error: "INVALID_AVATAR_FORMAT",
+          message: "Foto harus JPG, PNG, atau WEBP."
+        });
+      }
+
+      const mimeType = match[1];
+      const base64 = match[2];
+
+      const buffer = Buffer.from(base64, "base64");
+
+      if (buffer.length > 2 * 1024 * 1024) {
+        return res.status(400).json({
+          success: false,
+          error: "AVATAR_TOO_LARGE",
+          message: "Ukuran foto maksimal 2 MB."
+        });
+      }
+
       let ext = ".jpg";
 
-      if (req.file.mimetype === "image/png") {
+      if (mimeType === "image/png") {
         ext = ".png";
-      } else if (req.file.mimetype === "image/webp") {
+      } else if (mimeType === "image/webp") {
         ext = ".webp";
       }
 
@@ -502,20 +526,25 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
         ]);
 
       if (removeError) {
-        console.warn("[Profile Avatar] Old avatar removal:", removeError.message);
+        console.warn(
+          "[Profile Avatar] Old avatar removal:",
+          removeError.message
+        );
       }
 
-      const { data: uploadedFile, error: uploadError } =
-        await supabase.storage
-          .from("avatars")
-          .upload(storagePath, req.file.buffer, {
-            contentType: req.file.mimetype,
-            cacheControl: "3600",
-            upsert: true
-          });
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(storagePath, buffer, {
+          contentType: mimeType,
+          cacheControl: "3600",
+          upsert: true
+        });
 
       if (uploadError) {
-        console.error("[Profile Avatar] Upload failed:", uploadError);
+        console.error(
+          "[Profile Avatar] Upload failed:",
+          uploadError.message
+        );
 
         return res.status(500).json({
           success: false,
@@ -524,24 +553,16 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
         });
       }
 
-      console.log("[Profile Avatar] Uploaded:", uploadedFile);
-
       const { data: publicData } = supabase.storage
         .from("avatars")
         .getPublicUrl(storagePath);
 
-      if (!publicData?.publicUrl) {
-        return res.status(500).json({
-          success: false,
-          error: "AVATAR_URL_FAILED",
-          message: "Gagal mendapatkan URL foto profil."
-        });
-      }
+      updates.avatar_url = publicData.publicUrl;
 
-      updates.avatar_url =
-        `${publicData.publicUrl}?v=${Date.now()}`;
-
-      console.log("[Profile Avatar] URL:", updates.avatar_url);
+      console.log(
+        "[Profile Avatar] Saved:",
+        storagePath
+      );
     }
 
     const { data: user, error } = await supabase
@@ -552,7 +573,7 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
       .single();
 
     if (error) {
-      console.error("[Profile Update] DB update failed:", error);
+      console.error("[Profile Update] DB:", error);
 
       return res.status(500).json({
         success: false,
@@ -560,11 +581,6 @@ app.put("/api/me/profile", auth, avatarUpload.single("avatar"), async (req, res)
         message: error.message
       });
     }
-
-    console.log("[Profile Update] Success:", {
-      userId: user.id,
-      avatarUrl: user.avatar_url
-    });
 
     res.json({
       success: true,

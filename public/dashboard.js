@@ -1049,21 +1049,31 @@ async function saveProfile() {
     return;
   }
 
-  const form = new FormData();
+  const payload = {};
 
   if (name) {
-    form.append("name", name);
+    payload.name = name;
   }
 
   if (file) {
-    form.append("avatar", file, file.name);
-    console.log("[Profile Upload] Sending avatar:", {
-      name: file.name,
-      type: file.type,
-      size: file.size
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast("Foto harus JPG, PNG, atau WEBP.", "error");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast("Ukuran foto maksimal 2 MB.", "error");
+      return;
+    }
+
+    payload.avatar = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+
+      reader.readAsDataURL(file);
     });
-  } else {
-    console.warn("[Profile Upload] NO AVATAR FILE SELECTED");
   }
 
   if (saveBtn) {
@@ -1077,9 +1087,10 @@ async function saveProfile() {
     const response = await fetch("/api/me/profile", {
       method: "PUT",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: form
+      body: JSON.stringify(payload)
     });
 
     const result = await response.json();
@@ -1115,7 +1126,6 @@ async function saveProfile() {
     }
   }
 }
-
 function copyKey() {
   if (!me?.apiKey) {
     toast(
