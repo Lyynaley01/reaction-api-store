@@ -79,14 +79,14 @@
 
     <div class="eyebrow">ENDPOINT</div>
 
-    <h2>POST /api/v1/reaction</h2>
+    <h2>POST /api/reaction</h2>
 
     <div class="keyrow">
-      <code>https://reaction-api-store.vercel.app/api/v1/reaction</code>
+      <code>https://reaction-api-store.vercel.app/api/reaction</code>
 
       <button
         class="btn small"
-        onclick="copyText('https://reaction-api-store.vercel.app/api/v1/reaction','Endpoint')">
+        onclick="copyText('https://reaction-api-store.vercel.app/api/reaction','Endpoint')">
         Copy
       </button>
     </div>
@@ -102,10 +102,10 @@
 
     <h2>cURL</h2>
 
-<pre>curl -X POST https://reaction-api-store.vercel.app/api/v1/reaction \
+<div class="docs-code-wrap"><button class="docs-copy-code" type="button" data-copy-code>Copy</button><pre>curl -X POST https://reaction-api-store.vercel.app/api/reaction \
 -H "X-API-Key: RELS-REACTION-XXXX" \
 -H "Content-Type: application/json" \
--d '{"url":"https://whatsapp.com/channel/...","reaction":"❤️"}'</pre>
+-d '{"url":"https://whatsapp.com/channel/...","reaction":"❤️"}'</pre></div>
 
   </section>
 
@@ -118,8 +118,8 @@
 
     <h2>JavaScript</h2>
 
-<pre>const response = await fetch(
-  "https://reaction-api-store.vercel.app/api/v1/reaction",
+<div class="docs-code-wrap"><button class="docs-copy-code" type="button" data-copy-code>Copy</button><pre>const response = await fetch(
+  "https://reaction-api-store.vercel.app/api/reaction",
   {
     method: "POST",
     headers: {
@@ -135,7 +135,7 @@
 
 const data = await response.json();
 
-console.log(data);</pre>
+console.log(data);</pre></div>
 
   </section>
 
@@ -148,9 +148,9 @@ console.log(data);</pre>
 
     <h2>Python</h2>
 
-<pre>import requests
+<div class="docs-code-wrap"><button class="docs-copy-code" type="button" data-copy-code>Copy</button><pre>import requests
 
-url = "https://reaction-api-store.vercel.app/api/v1/reaction"
+url = "https://reaction-api-store.vercel.app/api/reaction"
 
 headers = {
     "X-API-Key": "RELS-REACTION-XXXX",
@@ -168,7 +168,7 @@ response = requests.post(
     json=data
 )
 
-print(response.json())</pre>
+print(response.json())</pre></div>
 
   </section>
 

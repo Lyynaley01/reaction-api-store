@@ -1,9 +1,7 @@
 const A = (id) => document.getElementById(id);
 
 function adminHeaders() {
-  return {
-    Authorization: "Bearer " + localStorage.adminToken
-  };
+  return {};
 }
 
 async function adminFetch(url, opts = {}) {
@@ -184,9 +182,378 @@ function renderRanking(targetId, items, type) {
     .join("");
 }
 
-function renderOrders(orders) {
-  const target = A("orders");
 
+// ============================================================
+// DELETE ORDER HISTORY
+// ============================================================
+let manualDeleteMode = false;
+let currentAdminOrders = [];
+
+function updateSelectedOrderCount() {
+  const selected = document.querySelectorAll(
+    ".admin-order-select:checked"
+  ).length;
+
+  const button = A("deleteSelectedOrdersBtn");
+
+  if (button) {
+    button.textContent = `Hapus Terpilih (${selected})`;
+    button.disabled = selected === 0;
+  }
+}
+
+function setManualDeleteMode(enabled) {
+  manualDeleteMode = Boolean(enabled);
+
+  document.querySelectorAll(".admin-order-select-wrap").forEach((wrap) => {
+    wrap.hidden = !manualDeleteMode;
+    wrap.setAttribute("aria-hidden", manualDeleteMode ? "false" : "true");
+  });
+
+  const bar = A("manualDeleteBar");
+
+  if (bar) {
+    bar.hidden = !manualDeleteMode;
+    bar.classList.toggle("is-visible", manualDeleteMode);
+  }
+
+  if (!manualDeleteMode) {
+    document.querySelectorAll(".admin-order-select").forEach((input) => {
+      input.checked = false;
+    });
+  }
+
+  updateSelectedOrderCount();
+}
+
+function openDeleteHistoryModal() {
+  const modal = A("deleteHistoryModal");
+  if (!modal) return;
+
+  modal.hidden = false;
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("open");
+}
+
+function closeDeleteHistoryModal() {
+  const modal = A("deleteHistoryModal");
+  if (!modal) return;
+
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  modal.hidden = true;
+}
+
+async function deleteAdminOrders(payload) {
+  const response = await adminFetch("/api/admin/orders", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response || response.success === false) {
+    throw new Error(
+      response?.message ||
+      response?.error ||
+      "Gagal menghapus riwayat order."
+    );
+  }
+
+  return response;
+}
+
+
+// CUSTOM DELETE HISTORY DIALOG
+let deleteDialogResolve = null;
+
+function ensureDeleteDialog() {
+  if (document.getElementById("adminDeleteDialog")) return;
+
+  const el = document.createElement("div");
+  el.id = "adminDeleteDialog";
+  el.className = "admin-delete-dialog";
+  el.hidden = true;
+
+  el.innerHTML = `
+    <div class="admin-delete-dialog-backdrop" data-delete-dialog-close></div>
+
+    <div class="admin-delete-dialog-card" role="dialog" aria-modal="true">
+      <div class="admin-delete-dialog-icon" id="adminDeleteDialogIcon">🗑️</div>
+
+      <div class="admin-delete-dialog-eyebrow" id="adminDeleteDialogEyebrow">
+        KONFIRMASI
+      </div>
+
+      <h3 id="adminDeleteDialogTitle">Hapus Riwayat?</h3>
+
+      <p id="adminDeleteDialogMessage">
+        Tindakan ini tidak dapat dibatalkan.
+      </p>
+
+      <div class="admin-delete-dialog-actions" id="adminDeleteDialogActions">
+        <button
+          type="button"
+          class="admin-delete-dialog-btn secondary"
+          id="adminDeleteDialogCancel">
+          Batal
+        </button>
+
+        <button
+          type="button"
+          class="admin-delete-dialog-btn danger"
+          id="adminDeleteDialogConfirm">
+          Hapus
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(el);
+
+  const close = () => {
+    if (!el.hidden) {
+      el.hidden = true;
+
+      if (deleteDialogResolve) {
+        const resolve = deleteDialogResolve;
+        deleteDialogResolve = null;
+        resolve(false);
+      }
+    }
+  };
+
+  el.querySelector("[data-delete-dialog-close]")?.addEventListener("click", close);
+  el.querySelector("#adminDeleteDialogCancel")?.addEventListener("click", close);
+
+  el.querySelector("#adminDeleteDialogConfirm")?.addEventListener("click", () => {
+    el.hidden = true;
+
+    if (deleteDialogResolve) {
+      const resolve = deleteDialogResolve;
+      deleteDialogResolve = null;
+      resolve(true);
+    }
+  });
+
+  el.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") close();
+  });
+}
+
+function showDeleteConfirm(count) {
+  ensureDeleteDialog();
+
+  const el = document.getElementById("adminDeleteDialog");
+  const icon = document.getElementById("adminDeleteDialogIcon");
+  const eyebrow = document.getElementById("adminDeleteDialogEyebrow");
+  const title = document.getElementById("adminDeleteDialogTitle");
+  const message = document.getElementById("adminDeleteDialogMessage");
+  const cancel = document.getElementById("adminDeleteDialogCancel");
+  const confirm = document.getElementById("adminDeleteDialogConfirm");
+
+  icon.textContent = "🗑️";
+  eyebrow.textContent = "KONFIRMASI HAPUS";
+  title.textContent = "Hapus Riwayat?";
+  message.textContent =
+    count === 1
+      ? "Hapus 1 order yang dipilih? Tindakan ini tidak dapat dibatalkan."
+      : `Hapus ${count.toLocaleString("id-ID")} order yang dipilih? Tindakan ini tidak dapat dibatalkan.`;
+
+  cancel.textContent = "Batal";
+  confirm.textContent = count === 1 ? "Hapus 1 Order" : `Hapus ${count} Order`;
+
+  confirm.className = "admin-delete-dialog-btn danger";
+  cancel.className = "admin-delete-dialog-btn secondary";
+
+  el.hidden = false;
+
+  requestAnimationFrame(() => {
+    confirm.focus();
+  });
+
+  return new Promise((resolve) => {
+    deleteDialogResolve = resolve;
+  });
+}
+
+function showDeleteResult(message, success = true) {
+  ensureDeleteDialog();
+
+  const el = document.getElementById("adminDeleteDialog");
+  const icon = document.getElementById("adminDeleteDialogIcon");
+  const eyebrow = document.getElementById("adminDeleteDialogEyebrow");
+  const title = document.getElementById("adminDeleteDialogTitle");
+  const text = document.getElementById("adminDeleteDialogMessage");
+  const actions = document.getElementById("adminDeleteDialogActions");
+
+  icon.textContent = success ? "✓" : "!";
+  icon.classList.toggle("success", success);
+  icon.classList.toggle("error", !success);
+
+  eyebrow.textContent = success ? "BERHASIL" : "GAGAL";
+  title.textContent = success ? "Riwayat Dihapus" : "Penghapusan Gagal";
+  text.textContent = message;
+
+  actions.innerHTML = `
+    <button
+      type="button"
+      class="admin-delete-dialog-btn ${success ? "success" : "danger"}"
+      id="adminDeleteDialogOk">
+      Oke
+    </button>
+  `;
+
+  el.hidden = false;
+
+  document.getElementById("adminDeleteDialogOk")?.addEventListener("click", () => {
+    el.hidden = true;
+  });
+
+  requestAnimationFrame(() => {
+    document.getElementById("adminDeleteDialogOk")?.focus();
+  });
+}
+
+async function deleteAllAdminOrders() {
+  const confirmed = await showDeleteConfirm(currentAdminOrders.length);
+
+  if (!confirmed) return;
+
+  try {
+    const response = await deleteAdminOrders({ all: true });
+
+    await loadAdmin();
+
+    setManualDeleteMode(false);
+
+    showDeleteResult(
+      response.message ||
+      `${response.deleted || 0} order berhasil dihapus.`,
+      true
+    );
+  } catch (err) {
+    console.error("[Delete All Orders]", err);
+
+    showDeleteResult(
+      err.message || "Gagal menghapus riwayat order.",
+      false
+    );
+  }
+}
+
+async function deleteSelectedAdminOrders() {
+  const selected = Array.from(
+    document.querySelectorAll(".admin-order-select:checked")
+  ).map((input) => String(input.value));
+
+  if (!selected.length) {
+    showDeleteResult("Belum ada order yang dipilih.", false);
+    return;
+  }
+
+  const confirmed = await showDeleteConfirm(selected.length);
+
+  if (!confirmed) return;
+
+  try {
+    const response = await deleteAdminOrders({
+      ids: selected
+    });
+
+    setManualDeleteMode(false);
+
+    await loadAdmin();
+
+    showDeleteResult(
+      response.message ||
+      `${response.deleted || selected.length} order berhasil dihapus.`,
+      true
+    );
+  } catch (err) {
+    console.error("[Delete Selected Orders]", err);
+
+    showDeleteResult(
+      err.message || "Gagal menghapus order yang dipilih.",
+      false
+    );
+  }
+}
+
+function initDeleteHistoryControls() {
+  const deleteHistoryBtn = A("deleteHistoryBtn");
+  const deleteAllHistoryBtn = A("deleteAllHistoryBtn");
+  const manualDeleteHistoryBtn = A("manualDeleteHistoryBtn");
+  const cancelDeleteHistory = A("cancelDeleteHistory");
+  const selectAllOrdersBtn = A("selectAllOrdersBtn");
+  const deleteSelectedOrdersBtn = A("deleteSelectedOrdersBtn");
+  const cancelManualDeleteBtn = A("cancelManualDeleteBtn");
+
+  if (deleteHistoryBtn) {
+    deleteHistoryBtn.onclick = openDeleteHistoryModal;
+  }
+
+  if (deleteAllHistoryBtn) {
+    deleteAllHistoryBtn.onclick = deleteAllAdminOrders;
+  }
+
+  if (manualDeleteHistoryBtn) {
+    manualDeleteHistoryBtn.onclick = () => {
+      closeDeleteHistoryModal();
+      setManualDeleteMode(true);
+
+      requestAnimationFrame(() => {
+        const firstCheckbox = document.querySelector(
+          ".admin-order-select-wrap:not([hidden]) .admin-order-select"
+        );
+
+        if (firstCheckbox) {
+          firstCheckbox.focus({ preventScroll: true });
+        }
+      });
+    };
+  }
+
+  if (cancelDeleteHistory) {
+    cancelDeleteHistory.onclick = closeDeleteHistoryModal;
+  }
+
+  if (cancelManualDeleteBtn) {
+    cancelManualDeleteBtn.onclick = () => {
+      setManualDeleteMode(false);
+    };
+  }
+
+  if (selectAllOrdersBtn) {
+    selectAllOrdersBtn.onclick = () => {
+      document
+        .querySelectorAll(".admin-order-select")
+        .forEach((input) => {
+          input.checked = true;
+        });
+
+      updateSelectedOrderCount();
+    };
+  }
+
+  if (deleteSelectedOrdersBtn) {
+    deleteSelectedOrdersBtn.onclick = deleteSelectedAdminOrders;
+  }
+
+  document.addEventListener("change", (event) => {
+    if (
+      event.target &&
+      event.target.classList.contains("admin-order-select")
+    ) {
+      updateSelectedOrderCount();
+    }
+  });
+}
+
+function renderOrders(orders) {
+  currentAdminOrders = Array.isArray(orders) ? orders : [];
+  const target = A("orders");
   if (!target) return;
 
   if (!orders || !orders.length) {
@@ -226,7 +593,16 @@ function renderOrders(orders) {
       }[x.status] || x.status;
 
       return `
-        <article class="admin-order-card">
+        <article class="admin-order-card" data-order-id="${escapeHtml(x.id)}">
+          <label class="admin-order-select-wrap" hidden aria-hidden="true">
+            <input
+              type="checkbox"
+              class="admin-order-select"
+              value="${escapeHtml(x.id)}"
+            >
+            <span>Pilih</span>
+          </label>
+
 
           <div class="order-user">
             <div class="order-avatar">
@@ -287,11 +663,11 @@ function renderOrders(orders) {
                   <button
                     class="btn small"
                     onclick="approve(
-                    '${escapeHtml(x.id)}',
-                    '${escapeHtml(name).replace("'", "\'")}',
-                    ${Number(x.coins || 0)},
-                    '${escapeHtml(duration).replace("'", "\'")}'
-                  )"
+                      '${escapeHtml(x.id)}',
+                      '${escapeHtml(name).replace(/'/g, "\\'")}',
+                      ${Number(x.coins || 0)},
+                      '${escapeHtml(duration).replace(/'/g, "\\'")}'
+                    )"
                   >
                     Approve
                   </button>
@@ -313,6 +689,8 @@ function renderOrders(orders) {
     })
     .join("");
 }
+  setManualDeleteMode(manualDeleteMode);
+
 
 async function loadAdmin() {
   try {
@@ -410,7 +788,6 @@ A("adminForm").onsubmit = async (e) => {
     }).then((x) => x.json());
 
     if (r.success) {
-      localStorage.adminToken = r.token;
       A("loginMsg").textContent = "";
       await loadAdmin();
     } else {
@@ -645,3 +1022,15 @@ A("rejectReason")?.addEventListener("keydown", (e) => {
 loadAdmin();
 
 window.viewPaymentProof = viewPaymentProof;
+
+
+// Pastikan kontrol delete history terpasang setelah DOM tersedia.
+if (document.readyState === "loading") {
+  document.addEventListener(
+    "DOMContentLoaded",
+    initDeleteHistoryControls,
+    { once: true }
+  );
+} else {
+  initDeleteHistoryControls();
+}

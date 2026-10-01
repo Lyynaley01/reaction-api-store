@@ -9,3 +9,6 @@ uploads/*
 
 npm-debug.log*
 .DS_Store
+.vercel
+.env*
+public/style.css.backup-*

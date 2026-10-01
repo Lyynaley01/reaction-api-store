@@ -46,10 +46,14 @@
         <img id="profileAvatarImage" alt="Profile photo">
       </div>
 
-      <label class="profile-photo-btn" for="profilePhoto">
-        Change Photo
-      </label>
-
+      <div class="profile-photo-editor" id="profilePhotoEditor" hidden>
+        <label class="profile-photo-btn" for="profilePhoto">
+          Change Photo
+        </label>
+        <div class="profile-preview-note">
+          JPG, PNG, atau WEBP · maksimal 2 MB
+        </div>
+      </div>
       <input
         id="profilePhoto"
         type="file"
@@ -82,9 +86,6 @@
       >
     </label>
 
-    <div class="profile-preview-note">
-      JPG, PNG, atau WEBP · maksimal 2 MB
-    </div>
 
     <div class="profile-editor-actions">
       <button class="copy-btn" id="cancelProfileBtn" type="button">
@@ -158,7 +159,7 @@
     <div class="credential">
       <div>
         <small>REACTION ENDPOINT</small>
-        <code id="endpointUrl">https://reaction-api-store.vercel.app/api/v1/reaction</code>
+        <code id="endpointUrl">https://reaction-api-store.vercel.app/api/reaction</code>
       </div>
       <button class="copy-btn" onclick="copyText('endpointUrl')">Copy</button>
     </div>

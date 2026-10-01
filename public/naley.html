@@ -85,11 +85,52 @@
     <!-- ORDERS -->
     <section class="admin-section">
 
-      <div class="admin-section-heading">
+      <div class="admin-section-heading admin-orders-heading">
         <div>
           <div class="eyebrow">STORE</div>
           <h2>Orders</h2>
           <p>Kelola pembelian dan pembayaran pengguna.</p>
+        </div>
+
+        <button
+          type="button"
+          class="btn small danger admin-history-btn"
+          id="deleteHistoryBtn"
+        >
+          Hapus Riwayat
+        </button>
+      </div>
+
+      <div id="manualDeleteBar" class="admin-manual-delete-bar" hidden>
+        <div>
+          <strong>Pilih riwayat yang ingin dihapus</strong>
+          <span id="selectedOrderCount">0 dipilih</span>
+        </div>
+
+        <div class="admin-manual-delete-actions">
+          <button
+            type="button"
+            class="btn small secondary-btn"
+            id="selectAllOrdersBtn"
+          >
+            Pilih Semua
+          </button>
+
+          <button
+            type="button"
+            class="btn small danger"
+            id="deleteSelectedOrdersBtn"
+          >
+            Hapus Terpilih
+          </button>
+
+          <button
+            type="button"
+            class="btn small secondary-btn"
+            id="cancelManualDeleteBtn"
+          >
+            Batal
+          </button>
         </div>
       </div>
 
@@ -103,6 +144,61 @@
 
 </main>
 
+
+<!-- DELETE HISTORY MODAL -->
+<div id="deleteHistoryModal" class="admin-modal" aria-hidden="true">
+  <div class="admin-modal-backdrop" data-close-delete-history></div>
+
+  <div
+    class="admin-modal-card admin-delete-history-modal-card"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="deleteHistoryTitle"
+  >
+    <div class="admin-modal-icon delete-history-icon">🗑</div>
+
+    <div class="admin-modal-content">
+      <div class="eyebrow">ORDER HISTORY</div>
+
+      <h3 id="deleteHistoryTitle">Hapus Riwayat</h3>
+
+      <p>
+        Pilih cara penghapusan riwayat order.
+        Tindakan ini tidak dapat dibatalkan.
+      </p>
+
+      <div class="admin-history-choice-grid">
+        <button
+          type="button"
+          class="admin-history-choice danger-choice"
+          id="deleteAllHistoryBtn"
+        >
+          <strong>Hapus Semua Riwayat</strong>
+          <span>Hapus seluruh order yang tersimpan.</span>
+        </button>
+
+        <button
+          type="button"
+          class="admin-history-choice manual-choice"
+          id="manualDeleteHistoryBtn"
+        >
+          <strong>Pilih Manual</strong>
+          <span>Pilih order tertentu sebelum menghapus.</span>
+        </button>
+      </div>
+
+      <div class="admin-modal-actions">
+        <button
+          type="button"
+          class="btn small secondary-btn"
+          id="cancelDeleteHistory"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- APPROVE MODAL -->
 <div id="approveModal" class="admin-modal" aria-hidden="true">

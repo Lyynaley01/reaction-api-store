@@ -37,7 +37,7 @@ npm start
 Buka:
 
 - Website: `http://IP-SERVER:3000`
-- Admin: `http://IP-SERVER:3000/admin.html`
+- Admin: `http://IP-SERVER:3000/naley.html`
 - API docs: `http://IP-SERVER:3000/docs.html`
 
 ## Domain sendiri
@@ -60,7 +60,7 @@ CORS_ORIGIN=https://api.domain-lo.com
 3. Pilih paket atau Custom.
 4. Sistem membuat order.
 5. User mengikuti instruksi pembayaran dan upload bukti.
-6. Admin login ke `/admin.html`.
+6. Admin login ke `/naley.html`.
 7. Admin approve.
 8. Coin masuk ke akun user.
 

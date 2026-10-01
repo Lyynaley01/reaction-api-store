@@ -2,6 +2,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -16,6 +17,11 @@ const app = express();
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error("JWT_SECRET wajib diatur dan minimal 32 karakter.");
+}
 
 if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
   throw new Error("SUPABASE_URL dan SUPABASE_SECRET_KEY wajib diatur.");
@@ -58,15 +64,29 @@ function id(prefix = "") {
   return prefix + crypto.randomBytes(12).toString("hex");
 }
 
-function apiKey() {
+async function apiKey() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let random = "";
 
-  for (let i = 0; i < 4; i++) {
-    random += chars[crypto.randomInt(chars.length)];
+  for (let attempt = 0; attempt < 10; attempt++) {
+    let random = "";
+
+    for (let i = 0; i < 4; i++) {
+      random += chars[crypto.randomInt(chars.length)];
+    }
+
+    const key = "RELS-REACTION-" + random;
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("id")
+      .eq("api_key", key)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return key;
   }
 
-  return "RELS-REACTION-" + random;
+  throw new Error("API_KEY_GENERATION_FAILED");
 }
 
 function now() {
@@ -122,7 +142,7 @@ function publicUser(u) {
 function issueToken(user) {
   return jwt.sign(
     { sub: user.id, email: user.email, role: user.role || "user" },
-    process.env.JWT_SECRET || "dev-secret-change-me",
+    JWT_SECRET,
     { expiresIn: "7d" }
   );
 }
@@ -143,7 +163,7 @@ async function auth(req, res, next) {
   try {
     const payload = jwt.verify(
       token,
-      process.env.JWT_SECRET || "dev-secret-change-me"
+      JWT_SECRET
     );
 
     const user = await getUserById(payload.sub);
@@ -168,15 +188,15 @@ async function auth(req, res, next) {
 }
 
 function adminAuth(req, res, next) {
-  const email = process.env.ADMIN_EMAIL;
-  const password = process.env.ADMIN_PASSWORD;
+  const email = normalizeEmail(process.env.ADMIN_EMAIL || "");
   const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : req.cookies?.adminToken;
+  const token = req.cookies?.adminToken ||
+    (header.startsWith("Bearer ") ? header.slice(7) : "");
 
   if (!token) return res.status(401).json({ success: false, error: "ADMIN_UNAUTHORIZED" });
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || "dev-secret-change-me");
+    const payload = jwt.verify(token, JWT_SECRET);
     if (payload.role !== "admin" || payload.email !== email) throw new Error();
     next();
   } catch {
@@ -275,7 +295,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use((req, res, next) => {
-  const origin = process.env.CORS_ORIGIN || "*";
+  const origin = process.env.CORS_ORIGIN;
+  if (!origin) {
+    return res.status(500).json({
+      success: false,
+      error: "CORS_NOT_CONFIGURED"
+    });
+  }
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
@@ -283,6 +309,7 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
+
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -306,7 +333,19 @@ app.get("/api/config", (_, res) => {
   });
 });
 
-app.post("/api/auth/register", async (req, res) => {
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "TOO_MANY_REGISTRATIONS",
+    message: "Terlalu banyak percobaan pendaftaran. Coba lagi beberapa menit."
+  }
+});
+
+app.post("/api/auth/register", registerLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
     const name = String(req.body.name || "").trim().slice(0, 80);
@@ -336,7 +375,7 @@ app.post("/api/auth/register", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const newApiKey = apiKey();
+    const newApiKey = await apiKey();
 
     const { data: user, error } = await supabase
       .from("users")
@@ -380,7 +419,19 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+const userLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "TOO_MANY_LOGIN_ATTEMPTS",
+    message: "Terlalu banyak percobaan login. Coba lagi beberapa menit."
+  }
+});
+
+app.post("/api/auth/login", userLoginLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
     const password = String(req.body.password || "");
@@ -416,32 +467,6 @@ app.post("/api/auth/logout", (_, res) => res.json({ success: true }));
 
 app.get("/api/me", auth, (req, res) => {
   res.json({ success: true, user: publicUser(req.user) });
-});
-
-app.put("/api/debug/profile-upload", avatarUpload.single("avatar"), async (req, res) => {
-  console.log("[DEBUG PROFILE UPLOAD]", {
-    userId: req.user.id,
-    body: req.body,
-    hasFile: !!req.file,
-    file: req.file ? {
-      fieldname: req.file.fieldname,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size
-    } : null
-  });
-
-  res.json({
-    success: true,
-    body: req.body,
-    hasFile: !!req.file,
-    file: req.file ? {
-      fieldname: req.file.fieldname,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size
-    } : null
-  });
 });
 
 app.put("/api/me/profile", auth, async (req, res) => {
@@ -578,7 +603,7 @@ app.put("/api/me/profile", auth, async (req, res) => {
       return res.status(500).json({
         success: false,
         error: "PROFILE_DB_UPDATE_FAILED",
-        message: error.message
+        message: "Gagal memperbarui profil."
       });
     }
 
@@ -593,13 +618,13 @@ app.put("/api/me/profile", auth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: "PROFILE_UPDATE_FAILED",
-      message: err.message || "Gagal memperbarui profil."
+      message: "Gagal memperbarui profil."
     });
   }
 });
 app.post("/api/me/regenerate-key", auth, async (req, res) => {
   try {
-    const newApiKey = apiKey();
+    const newApiKey = await apiKey();
 
     const { data: user, error } = await supabase
       .from("users")
@@ -911,7 +936,7 @@ app.get("/api/orders/:id/status", auth, async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "ORDER_STATUS_FAILED",
-      message: err.message || "Database error",
+      message: "Terjadi kesalahan server.",
       details: err.details || null,
       hint: err.hint || null,
       code: err.code || null
@@ -1006,7 +1031,23 @@ app.get("/api/dashboard/stats", auth, async (req, res) => {
   }
 });
 
-app.post("/api/v1/reaction", async (req, res) => {
+const reactionRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const key = extractApiKey(req);
+    return key || "anonymous";
+  },
+  message: {
+    success: false,
+    error: "TOO_MANY_REQUESTS",
+    message: "Terlalu banyak request reaction. Coba lagi nanti."
+  }
+});
+
+app.post("/api/reaction", reactionRateLimiter, async (req, res) => {
   const user = await getApiUser(req);
 
   if (!user) {
@@ -1026,7 +1067,26 @@ app.post("/api/v1/reaction", async (req, res) => {
     });
   }
 
-  if (!/^https?:\/\/.+/i.test(url)) {
+  let targetUrl;
+
+  try {
+    targetUrl = new URL(url);
+  } catch {
+    return res.status(400).json({
+      success: false,
+      error: "INVALID_URL"
+    });
+  }
+
+  const hostname = targetUrl.hostname.toLowerCase();
+
+  if (
+    targetUrl.protocol !== "https:" ||
+    targetUrl.username ||
+    targetUrl.password ||
+    targetUrl.port ||
+    (hostname !== "whatsapp.com" && !hostname.endsWith(".whatsapp.com"))
+  ) {
     return res.status(400).json({
       success: false,
       error: "INVALID_URL"
@@ -1098,7 +1158,7 @@ app.post("/api/v1/reaction", async (req, res) => {
 
       await supabase.from("usage_logs").insert({
         user_id: user.id,
-        endpoint: "/api/v1/reaction",
+        endpoint: "/api/reaction",
         target_url: url,
         reaction,
         coins_used: 0,
@@ -1126,7 +1186,7 @@ app.post("/api/v1/reaction", async (req, res) => {
     // Provider sukses → coin tetap terpakai.
     await supabase.from("usage_logs").insert({
       user_id: user.id,
-      endpoint: "/api/v1/reaction",
+      endpoint: "/api/reaction",
       target_url: url,
       reaction,
       coins_used: 1,
@@ -1164,13 +1224,13 @@ app.post("/api/v1/reaction", async (req, res) => {
 
     await supabase.from("usage_logs").insert({
       user_id: user.id,
-      endpoint: "/api/v1/reaction",
+      endpoint: "/api/reaction",
       target_url: url,
       reaction,
       coins_used: 0,
       status: "failed",
       response_data: {
-        error: err.message
+        error: "REACTION_UPSTREAM_ERROR"
       }
     });
 
@@ -1183,7 +1243,19 @@ app.post("/api/v1/reaction", async (req, res) => {
 });
 
 // Admin
-app.post("/api/admin/login", (req, res) => {
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "TOO_MANY_LOGIN_ATTEMPTS",
+    message: "Terlalu banyak percobaan login. Coba lagi beberapa menit."
+  }
+});
+
+app.post("/api/admin/login", adminLoginLimiter, (req, res) => {
   const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || "");
 
@@ -1196,11 +1268,19 @@ app.post("/api/admin/login", (req, res) => {
 
   const token = jwt.sign(
     { role: "admin", email },
-    process.env.JWT_SECRET || "dev-secret-change-me",
+    JWT_SECRET,
     { expiresIn: "12h" }
   );
 
-  res.json({ success: true, token });
+  res.cookie("adminToken", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 12 * 60 * 60 * 1000,
+    path: "/"
+  });
+
+  res.json({ success: true });
 });
 
 app.get("/api/admin/stats", adminAuth, async (_, res) => {
@@ -1317,6 +1397,56 @@ app.get("/api/admin/rankings", adminAuth, async (_, res) => {
   }
 });
 
+
+/* =========================================================
+   ADMIN — DELETE ORDER HISTORY
+   ========================================================= */
+app.delete("/api/admin/orders", adminAuth, async (req, res) => {
+  try {
+    const all = req.body?.all === true;
+    const ids = Array.isArray(req.body?.ids)
+      ? req.body.ids.map(String).filter(Boolean)
+      : [];
+
+    if (!all && !ids.length) {
+      return res.status(400).json({
+        success: false,
+        error: "NO_ORDERS_SELECTED",
+        message: "Tidak ada order yang dipilih."
+      });
+    }
+
+    let query = supabase.from("orders").delete();
+
+    if (all) {
+      // Filter supaya Supabase menjalankan DELETE secara eksplisit.
+      query = query.not("id", "is", null);
+    } else {
+      query = query.in("id", ids);
+    }
+
+    const { data, error } = await query.select("id");
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      deleted: Array.isArray(data) ? data.length : 0,
+      message: all
+        ? "Semua riwayat order berhasil dihapus."
+        : "Order yang dipilih berhasil dihapus."
+    });
+  } catch (err) {
+    console.error("[Admin Delete Orders]", err);
+
+    res.status(500).json({
+      success: false,
+      error: "ADMIN_ORDER_DELETE_FAILED",
+      message: "Gagal menghapus riwayat order."
+    });
+  }
+});
+
 app.get("/api/admin/orders", adminAuth, async (_, res) => {
   try {
     const { data: orders, error } = await supabase
@@ -1397,92 +1527,61 @@ app.get("/api/admin/proof/:file", adminAuth, async (req, res) => {
 
 app.post("/api/admin/orders/:id/approve", adminAuth, async (req, res) => {
   try {
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("id", req.params.id)
-      .maybeSingle();
-
-    if (orderError) throw orderError;
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: "ORDER_NOT_FOUND"
-      });
-    }
-
-    if (order.status !== "pending") {
-      return res.status(400).json({
-        success: false,
-        error: "ORDER_NOT_PENDING"
-      });
-    }
-
-    if (!order.payment_proof) {
-      return res.status(400).json({
-        success: false,
-        error: "PAYMENT_PROOF_REQUIRED",
-        message: "Order belum memiliki bukti pembayaran."
-      });
-    }
-
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", order.user_id)
-      .maybeSingle();
-
-    if (userError) throw userError;
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "USER_NOT_FOUND"
-      });
-    }
-
-    const currentCoins = availableCoins(user);
-    const newCoins = currentCoins + Number(order.coins);
-
-    const newExpiry = calculateCoinExpiry(
-      user.coin_expiry,
-      order.duration
+    /*
+     * Approval dilakukan di PostgreSQL secara atomic.
+     * Admin endpoint hanya boleh memanggil RPC yang sudah
+     * dikunci untuk service_role.
+     */
+    const { data: result, error } = await supabase.rpc(
+      "approve_order_atomic",
+      {
+        p_order_id: req.params.id
+      }
     );
 
-    const approvedAt = now();
+    if (error) {
+      console.error("[Admin Approve RPC]", error);
 
-    const { error: userUpdateError } = await supabase
-      .from("users")
-      .update({
-        coins: newCoins,
-        coin_expiry: newExpiry,
-        updated_at: approvedAt
-      })
-      .eq("id", user.id);
+      return res.status(500).json({
+        success: false,
+        error: "ORDER_APPROVE_FAILED"
+      });
+    }
 
-    if (userUpdateError) throw userUpdateError;
+    if (!result || result.success !== true) {
+      const errorCode = result?.error || "ORDER_APPROVE_FAILED";
 
-    const { error: orderUpdateError } = await supabase
-      .from("orders")
-      .update({
-        status: "approved",
-        approved_at: approvedAt,
-        updated_at: approvedAt
-      })
-      .eq("id", order.id)
-      .eq("status", "pending");
+      const statusMap = {
+        ORDER_NOT_FOUND: 404,
+        ORDER_NOT_PENDING: 400,
+        PAYMENT_PROOF_REQUIRED: 400,
+        USER_NOT_FOUND: 404,
+        INVALID_DURATION: 400,
+        INVALID_CUSTOM_DURATION: 400
+      };
 
-    if (orderUpdateError) throw orderUpdateError;
+      return res.status(statusMap[errorCode] || 400).json({
+        success: false,
+        error: errorCode,
+        message:
+          errorCode === "PAYMENT_PROOF_REQUIRED"
+            ? "Order belum memiliki bukti pembayaran."
+            : errorCode === "ORDER_NOT_PENDING"
+              ? "Order sudah tidak berstatus pending."
+              : errorCode === "ORDER_NOT_FOUND"
+                ? "Order tidak ditemukan."
+                : "Order tidak dapat di-approve."
+      });
+    }
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Order approved dan coin masuk."
+      message: result.message || "Order approved dan coin masuk."
     });
   } catch (err) {
     console.error("[Admin Approve]", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: "ORDER_APPROVE_FAILED"
     });
@@ -1492,56 +1591,56 @@ app.post("/api/admin/orders/:id/approve", adminAuth, async (req, res) => {
 app.post("/api/admin/orders/:id/reject", adminAuth, async (req, res) => {
   try {
     const reason = String(
-      req.body.reason || "Pembayaran tidak valid."
-    ).slice(0, 300);
+      req.body?.reason || "Pembayaran tidak valid."
+    ).trim();
 
-    const { data: order, error: findError } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("id", req.params.id)
-      .maybeSingle();
+    const { data: result, error } = await supabase.rpc(
+      "reject_order_atomic",
+      {
+        p_order_id: req.params.id,
+        p_reason: reason
+      }
+    );
 
-    if (findError) throw findError;
+    if (error) {
+      console.error("[Admin Reject RPC]", error);
 
-    if (!order) {
-      return res.status(404).json({
+      return res.status(500).json({
         success: false,
-        error: "ORDER_NOT_FOUND"
+        error: "ORDER_REJECT_FAILED"
       });
     }
 
-    if (order.status !== "pending") {
-      return res.status(400).json({
+    if (!result || result.success !== true) {
+      const errorCode = result?.error || "ORDER_REJECT_FAILED";
+
+      const statusMap = {
+        ORDER_NOT_FOUND: 404,
+        ORDER_NOT_PENDING: 400
+      };
+
+      return res.status(statusMap[errorCode] || 400).json({
         success: false,
-        error: "ORDER_NOT_PENDING"
+        error: errorCode,
+        message:
+          errorCode === "ORDER_NOT_FOUND"
+            ? "Order tidak ditemukan."
+            : errorCode === "ORDER_NOT_PENDING"
+              ? "Order sudah tidak berstatus pending."
+              : "Order tidak dapat ditolak."
       });
     }
 
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update({
-        status: "rejected",
-        reason
-      })
-      .eq("id", order.id)
-      .eq("status", "pending");
-
-    if (updateError) throw updateError;
-
-    res.json({
+    return res.json({
       success: true,
-      message: "Order ditolak."
+      message: result.message || "Order berhasil ditolak."
     });
   } catch (err) {
     console.error("[Admin Reject]", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: "ORDER_REJECT_FAILED",
-      message: err.message || "Database error",
-      details: err.details || null,
-      hint: err.hint || null,
-      code: err.code || null
+      error: "ORDER_REJECT_FAILED"
     });
   }
 });
@@ -1551,7 +1650,7 @@ app.get("/docs", (_, res) => res.sendFile(path.join(__dirname, "public", "docs.h
 app.use((err, req, res, next) => {
   console.error(err);
   if (err instanceof multer.MulterError || err.message?.includes("Format bukti")) {
-    return res.status(400).json({ success: false, error: err.message });
+    return res.status(400).json({ success: false, error: "REACTION_UPSTREAM_ERROR" });
   }
   res.status(500).json({ success: false, error: "INTERNAL_SERVER_ERROR" });
 });
@@ -1564,3 +1663,18 @@ if (require.main === module) {
 }
 
 module.exports = app;
+
+// Custom HTML 404 untuk halaman web yang tidak ditemukan.
+// Endpoint /api/* tetap mengembalikan JSON agar client API tidak menerima HTML.
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    return res.status(404).json({
+      success: false,
+      error: "NOT_FOUND"
+    });
+  }
+
+  return res.status(404).sendFile(
+    path.join(__dirname, "public", "404.html")
+  );
+});
