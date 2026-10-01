@@ -611,47 +611,106 @@ async function loadOrders() {
       return;
     }
 
-    container.innerHTML = orders.map(o => `
-      <div class="order-card">
+    container.innerHTML = orders.map(o => {
+      const durationMap = {
+        permanent: {
+          name: "Paket Permanen",
+          active: "Aktif selamanya"
+        },
+        "30_days": {
+          name: "Paket 30 Hari",
+          active: "Aktif selama 30 hari"
+        },
+        "7_days": {
+          name: "Paket 7 Hari",
+          active: "Aktif selama 7 hari"
+        }
+      };
 
-        <div class="order-main">
+      const customMatch = String(o.duration || "").match(/^custom_(\d+)$/);
 
-          <div class="order-id">
-            ${escapeHtml(o.id)}
+      const packageInfo = durationMap[o.duration] || (
+        customMatch
+          ? {
+              name: "Paket Custom",
+              active: `Aktif selama ${customMatch[1]} hari`
+            }
+          : {
+              name: "Paket Coin",
+              active: "Masa aktif sesuai paket"
+            }
+      );
+
+      const statusMap = {
+        approved: "Disetujui",
+        pending: "Menunggu Verifikasi Admin",
+        rejected: "Ditolak"
+      };
+
+      const statusText =
+        statusMap[o.status] ||
+        String(o.status || "Tidak diketahui");
+
+      return `
+        <div class="order-card">
+          <div class="order-main">
+
+            <div class="order-package">
+              <span class="order-package-icon">📦</span>
+
+              <div>
+                <strong>${escapeHtml(packageInfo.name)}</strong>
+
+                <span>
+                  ${Number(o.coins || 0).toLocaleString("id-ID")} coin
+                  · ${escapeHtml(packageInfo.active)}
+                </span>
+              </div>
+            </div>
+
+            <div class="order-details">
+              <span>
+                <b>Harga</b>
+                Rp${Number(o.price || 0).toLocaleString("id-ID")}
+              </span>
+            </div>
+
           </div>
 
-          <div class="order-info">
-            ${Number(o.coins || 0).toLocaleString("id-ID")} coin
-            · ${escapeHtml(o.duration)}
-            · Rp${Number(o.price || 0).toLocaleString("id-ID")}
+          <div class="order-side">
+
+            <span class="status ${escapeHtml(o.status || "")}">
+              ${escapeHtml(statusText)}
+            </span>
+
+            ${
+              o.status === "pending"
+                ? `
+                  <button
+                    class="primary-btn order-payment-btn"
+                    type="button"
+                    onclick='openExistingPaymentModal(${JSON.stringify(o)})'
+                  >
+                    Cek Pembayaran
+                  </button>
+                `
+                : o.status === "rejected"
+                  ? `
+                    <button
+                      class="primary-btn order-reason-btn"
+                      type="button"
+                      onclick='showOrderRejectReason(${JSON.stringify(o.reason || "Admin tidak memberikan alasan.")})'
+                    >
+                      Lihat Alasan
+                    </button>
+                  `
+                  : ""
+            }
+
           </div>
-
         </div>
-
-        <div class="order-side">
-
-          <span class="status ${escapeHtml(o.status)}">
-            ${escapeHtml(o.status)}
-          </span>
-
-          ${
-            o.status === "pending"
-              ? `
-                <button
-                  class="primary-btn order-payment-btn"
-                  type="button"
-                  onclick='openExistingPaymentModal(${JSON.stringify(o)})'
-                >
-                  Bayar / Cek Status
-                </button>
-              `
-              : ""
-          }
-
-        </div>
-
-      </div>
-    `).join("");
+      `;
+    }).join("");
 
   } catch (err) {
     console.error("[Orders]", err);
@@ -664,6 +723,88 @@ async function loadOrders() {
   }
 }
 
+
+/* =========================
+   REJECT REASON
+========================= */
+function showOrderRejectReason(reason) {
+  const oldModal = document.getElementById("orderRejectReasonModal");
+  if (oldModal) oldModal.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "orderRejectReasonModal";
+  modal.className = "admin-modal dashboard-confirm-modal";
+  modal.setAttribute("aria-hidden", "false");
+
+  modal.innerHTML = `
+    <div class="admin-modal-backdrop" data-close-order-reason></div>
+
+    <div class="admin-modal-card" role="dialog" aria-modal="true">
+      <div class="admin-modal-icon">!</div>
+
+      <div class="admin-modal-content">
+        <div class="eyebrow">ORDER REJECTED</div>
+        <h3>Pembelian Ditolak</h3>
+
+        <p class="order-reject-reason-text">
+          ${escapeHtml(String(reason || "Admin tidak memberikan alasan."))}
+        </p>
+
+        <div class="admin-modal-actions">
+          <button
+            type="button"
+            class="btn small secondary-btn"
+            data-close-order-reason
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const close = () => {
+    modal.remove();
+  };
+
+  modal.querySelectorAll("[data-close-order-reason]").forEach(el => {
+    el.addEventListener("click", close);
+  });
+
+  requestAnimationFrame(() => {
+    modal.classList.add("open");
+  });
+}
+
+/* =========================
+   REALTIME ORDER STATUS
+========================= */
+let orderRealtimeTimer = null;
+
+function startOrderRealtime() {
+  if (orderRealtimeTimer) {
+    clearInterval(orderRealtimeTimer);
+  }
+
+  orderRealtimeTimer = setInterval(async () => {
+    if (document.hidden) return;
+
+    try {
+      await loadOrders(true);
+    } catch (err) {
+      console.error("[Order Realtime]", err);
+    }
+  }, 5000);
+}
+
+function stopOrderRealtime() {
+  if (orderRealtimeTimer) {
+    clearInterval(orderRealtimeTimer);
+    orderRealtimeTimer = null;
+  }
+}
 
 /* =========================
    DELETE ALL ORDERS
@@ -801,7 +942,8 @@ async function loadUsage() {
         <div class="usage-main">
 
           <div class="usage-reaction">
-            ${escapeHtml(x.reaction || "—")}
+            <span class="usage-reaction-icon">✨</span>
+            <strong>${escapeHtml(x.reaction || "Reaction")}</strong>
           </div>
 
           <div class="usage-url">
@@ -813,7 +955,13 @@ async function loadUsage() {
         <div class="usage-side">
 
           <span class="status ${escapeHtml(x.status || "")}">
-            ${escapeHtml(x.status || "unknown")}
+            ${escapeHtml(
+              x.status === "success"
+                ? "Berhasil"
+                : x.status === "failed"
+                  ? "Gagal"
+                  : x.status || "Tidak diketahui"
+            )}
           </span>
 
           <small>
@@ -941,7 +1089,6 @@ $("confirmDeleteHistory")?.addEventListener(
 function renderProfile(user) {
   const name = user.name || "User";
   const email = user.email || "-";
-
   const nameEl = $("profileName");
   const emailEl = $("profileEmail");
   const initialEl = $("profileAvatarInitial");
@@ -953,33 +1100,65 @@ function renderProfile(user) {
   if (initialEl) initialEl.textContent = name.charAt(0).toUpperCase();
   if (inputEl) inputEl.value = user.name || "";
 
-  if (imageEl) {
-    if (user.avatarUrl) {
-      imageEl.src =
-        `${user.avatarUrl}${user.avatarUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
-      imageEl.style.display = "block";
+  if (!imageEl) return;
 
-      if (initialEl) {
-        initialEl.style.display = "none";
-      }
-    } else {
-      imageEl.removeAttribute("src");
-      imageEl.style.display = "none";
+  if (!user.avatarUrl) {
+    imageEl.onload = null;
+    imageEl.onerror = null;
+    imageEl.removeAttribute("src");
+    imageEl.style.display = "none";
 
-      if (initialEl) {
-        initialEl.style.display = "flex";
-      }
+    if (initialEl) {
+      initialEl.style.display = "flex";
+    }
+
+    return;
+  }
+
+  const avatarUrl =
+    `${user.avatarUrl}${user.avatarUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+
+  imageEl.onload = () => {
+    imageEl.style.display = "block";
+
+    if (initialEl) {
+      initialEl.style.display = "none";
+    }
+  };
+
+  imageEl.onerror = () => {
+    imageEl.removeAttribute("src");
+    imageEl.style.display = "none";
+
+    if (initialEl) {
+      initialEl.style.display = "flex";
+    }
+  };
+
+  imageEl.src = avatarUrl;
+
+  // Handle cached images.
+  if (imageEl.complete && imageEl.naturalWidth > 0) {
+    imageEl.style.display = "block";
+
+    if (initialEl) {
+      initialEl.style.display = "none";
     }
   }
 }
-
 function openProfileEditor() {
   const editor = $("profileEditor");
   const input = $("profileNameInput");
+  const photoEditor = $("profilePhotoEditor");
 
   if (!editor) return;
 
   editor.hidden = false;
+
+  if (photoEditor) {
+    photoEditor.hidden = false;
+    photoEditor.style.display = "block";
+  }
 
   if (input) {
     input.value = me?.name || "";
@@ -989,18 +1168,22 @@ function openProfileEditor() {
 
 function closeProfileEditor() {
   const editor = $("profileEditor");
+  const input = $("profileNameInput");
+  const photoEditor = $("profilePhotoEditor");
 
   if (editor) {
     editor.hidden = true;
   }
 
-  const input = $("profileNameInput");
+  if (photoEditor) {
+    photoEditor.hidden = true;
+    photoEditor.style.display = "none";
+  }
 
   if (input) {
     input.value = me?.name || "";
   }
 }
-
 function previewProfilePhoto(event) {
   const file = event.target.files?.[0];
 
@@ -1242,3 +1425,19 @@ document.addEventListener("DOMContentLoaded", () => {
     previewProfilePhoto
   );
 });
+
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopOrderRealtime();
+  } else {
+    loadOrders(true);
+    startOrderRealtime();
+  }
+});
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startOrderRealtime, { once: true });
+} else {
+  startOrderRealtime();
+}
