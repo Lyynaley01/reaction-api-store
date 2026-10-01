@@ -9757,3 +9757,45 @@ body {
   max-width: 100%;
 }
 
+
+/* =========================
+   FINAL MOBILE UI FIX
+========================= */
+
+/* Lihat Alasan jangan di-stretch oleh parent order-side */
+.order-side .order-reason-btn,
+.order-reason-btn {
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: 160px !important;
+  align-self: flex-end !important;
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  padding-left: 18px !important;
+  padding-right: 18px !important;
+}
+
+/* Paket harga: gesture dari dalam card tetap bisa scroll vertikal */
+.dashboard-list,
+#packages,
+#packagesList,
+.package-card,
+.package-card * {
+  touch-action: pan-y;
+}
+
+/* Cegah elemen paket membuat halaman bergeser horizontal */
+#packages,
+#packagesList,
+.package-card {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Scroll vertikal tetap diprioritaskan di area paket */
+#packagesList {
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
+}
+
