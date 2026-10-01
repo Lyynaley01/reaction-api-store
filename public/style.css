@@ -9721,3 +9721,39 @@ body:has(.admin-page #manualDeleteBar.is-visible) {
   box-shadow: 0 1px 0 #292632 !important;
 }
 
+
+/* =========================
+   FIX MOBILE TOUCH / ORDER BUTTON
+========================= */
+
+/* Tombol alasan jangan mengikuti width: 100% dari .primary-btn */
+.order-reason-btn {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: max-content;
+  flex: 0 0 auto !important;
+  padding: 0 22px !important;
+  height: 44px !important;
+  white-space: nowrap;
+}
+
+/* History/order section tetap mengikuti gesture vertikal HP */
+.dash-panel {
+  touch-action: pan-y;
+}
+
+/* Jangan biarkan halaman melebar ke samping */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Elemen card tidak boleh memaksa viewport melebar */
+.dash-panel,
+.profile-card,
+.dashboard-list,
+.order-card {
+  max-width: 100%;
+}
+
